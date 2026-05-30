@@ -106,14 +106,14 @@ const app = {
                 <button id="btn-monitor-nav" onclick="router.navigate('cocina')">Monitor</button>
             `;
             sidebarMenu.innerHTML = `
-                <div class="sidebar-item" onclick="router.navigate('admin_dashboard')">📊 Dashboard</div>
-                <div class="sidebar-item" onclick="router.navigate('admin_informes')">📈 Informes</div>
-                <div class="sidebar-item" id="btn-catalogo-nav" onclick="router.navigate('admin_productos')">🌮 Catálogo</div>
-                <div class="sidebar-item" onclick="router.navigate('admin_carnes')">🥩 Carnes</div>
-                <div class="sidebar-item" onclick="router.navigate('admin_croquis')">📐 Mesas</div>
-                <div class="sidebar-item" onclick="router.navigate('admin_gastos')">💸 Gastos</div>
-                <div class="sidebar-item" onclick="router.navigate('admin_hrm')">👥 Personal</div>
-                <div class="sidebar-item" id="btn-config-nav" onclick="router.navigate('config')">⚙️ Ajustes</div>
+                <div class="sidebar-item" onclick="router.navigate('admin_dashboard')"><span>📊</span> Dashboard</div>
+                <div class="sidebar-item" onclick="router.navigate('admin_informes')"><span>📈</span> Informes</div>
+                <div class="sidebar-item" id="btn-catalogo-nav" onclick="router.navigate('admin_productos')"><span>🌮</span> Catálogo</div>
+                <div class="sidebar-item" onclick="router.navigate('admin_carnes')"><span>🥩</span> Carnes</div>
+                <div class="sidebar-item" onclick="router.navigate('admin_croquis')"><span>📐</span> Mesas</div>
+                <div class="sidebar-item" onclick="router.navigate('admin_gastos')"><span>💸</span> Gastos</div>
+                <div class="sidebar-item" onclick="router.navigate('admin_hrm')"><span>👥</span> Personal</div>
+                <div class="sidebar-item" id="btn-config-nav" onclick="router.navigate('config')"><span>⚙️</span> Ajustes</div>
             `;
             router.navigate('pos');
         } else {
