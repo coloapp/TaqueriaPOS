@@ -6,8 +6,8 @@ jdk-21.0.11/
 jdk21.zip
 
 # Private memory (Gemini CLI)
-MEMORY.md
-.gemini/
+# Removed MEMORY.md to allow cloud backup as requested by user
+# .gemini/ 
 
 # OS files
 .DS_Store
