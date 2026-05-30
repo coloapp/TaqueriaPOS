@@ -105,21 +105,23 @@ const app = {
                 <button id="btn-caja-nav" onclick="router.navigate('caja')">Caja</button>
                 <button id="btn-monitor-nav" onclick="router.navigate('cocina')">Monitor</button>
             `;
-            sidebarMenu.innerHTML = `
-                <div class="sidebar-item" onclick="router.navigate('admin_dashboard')"><span>📊</span> Dashboard</div>
-                <div class="sidebar-item" onclick="router.navigate('admin_informes')"><span>📈</span> Informes</div>
-                <div class="sidebar-item" id="btn-catalogo-nav" onclick="router.navigate('admin_productos')"><span>🌮</span> Catálogo</div>
-                <div class="sidebar-item" onclick="router.navigate('admin_carnes')"><span>🥩</span> Carnes</div>
-                <div class="sidebar-item" onclick="router.navigate('admin_croquis')"><span>📐</span> Mesas</div>
-                <div class="sidebar-item" onclick="router.navigate('admin_gastos')"><span>💸</span> Gastos</div>
-                <div class="sidebar-item" onclick="router.navigate('admin_hrm')"><span>👥</span> Personal</div>
-                <div class="sidebar-item" id="btn-config-nav" onclick="router.navigate('config')"><span>⚙️</span> Ajustes</div>
-            `;
             router.navigate('pos');
         } else {
             mainNav.innerHTML = `<button id="btn-mesas-nav" onclick="router.navigate('mesas')">Mesas</button>`;
             router.navigate('mesas');
         }
+
+        // El menú lateral ahora es visible para ambos roles por petición del usuario
+        sidebarMenu.innerHTML = `
+            <div class="sidebar-item" onclick="router.navigate('admin_dashboard')"><span>📊</span> Dashboard</div>
+            <div class="sidebar-item" onclick="router.navigate('admin_informes')"><span>📈</span> Informes</div>
+            <div class="sidebar-item" id="btn-catalogo-nav" onclick="router.navigate('admin_productos')"><span>🌮</span> Catálogo</div>
+            <div class="sidebar-item" onclick="router.navigate('admin_carnes')"><span>🥩</span> Carnes</div>
+            <div class="sidebar-item" onclick="router.navigate('admin_croquis')"><span>📐</span> Mesas</div>
+            <div class="sidebar-item" onclick="router.navigate('admin_gastos')"><span>💸</span> Gastos</div>
+            <div class="sidebar-item" onclick="router.navigate('admin_hrm')"><span>👥</span> Personal</div>
+            <div class="sidebar-item" id="btn-config-nav" onclick="router.navigate('config')"><span>⚙️</span> Ajustes</div>
+        `;
     }
 };
 

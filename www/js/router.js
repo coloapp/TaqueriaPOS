@@ -882,15 +882,17 @@ const router = {
 
         // Render Categorías
         catList.innerHTML = `
-            <div class="sidebar-item ${!this._selectedAdminCat ? 'active' : ''}" style="padding:12px; margin-bottom:5px; border-radius:8px; border:1px solid transparent; cursor:pointer; display:flex; justify-content:space-between; align-items:center; font-weight:bold; font-size:0.85rem;" onclick="router._selectedAdminCat=null; router.refreshAdminCatalog()">
+            <div class="sidebar-item ${!this._selectedAdminCat ? 'active' : ''}" onclick="router._selectedAdminCat=null; router.refreshAdminCatalog()">
+                <span>📁</span>
                 <span>Ver Todos</span>
             </div>
         ` + db.categorias.map(c => `
-            <div class="sidebar-item ${this._selectedAdminCat === c ? 'active' : ''}" style="padding:12px; margin-bottom:5px; border-radius:8px; border:1px solid #eee; cursor:pointer; display:flex; justify-content:space-between; align-items:center; font-size:0.85rem;" onclick="router._selectedAdminCat='${c}'; router.refreshAdminCatalog()">
+            <div class="sidebar-item ${this._selectedAdminCat === c ? 'active' : ''}" onclick="router._selectedAdminCat='${c}'; router.refreshAdminCatalog()">
+                <span>🏷️</span>
                 <span style="flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c}</span>
-                <div style="display:flex; gap:8px;">
-                    <span onclick="event.stopPropagation(); router.showCategoryModal('${c}')" style="color:var(--accent); font-size:1.1rem;">✎</span>
-                    <span onclick="event.stopPropagation(); router.handleDeleteCategory('${c}')" style="color:red; font-size:1.1rem;">×</span>
+                <div style="display:flex; gap:12px; margin-left: auto;">
+                    <span onclick="event.stopPropagation(); router.showCategoryModal('${c}')" style="color:var(--accent); padding: 5px;">✎</span>
+                    <span onclick="event.stopPropagation(); router.handleDeleteCategory('${c}')" style="color:red; padding: 5px;">×</span>
                 </div>
             </div>
         `).join('');
