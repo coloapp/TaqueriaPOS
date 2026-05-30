@@ -1,0 +1,307 @@
+:root {
+    --primary: #d32f2f;
+    --primary-dark: #b71c1c;
+    --accent: #ff9800;
+    --bg-dark: #1a1a1a;
+    --text-light: #f5f5f5;
+    --text-dark: #333;
+    --surface: #ffffff;
+    --shadow: 0 4px 12px rgba(0,0,0,0.15);
+    --radius: 12px;
+    --header-h: 60px;
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body, html {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: #f4f4f4;
+    color: var(--text-dark);
+    height: 100%;
+    width: 100%;
+}
+
+/* --- Splash Screen --- */
+#splash-screen {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle, #333 0%, #000 100%);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    z-index: 10000;
+    transition: opacity 0.5s ease;
+}
+
+.pastor-roll {
+    width: 100px; height: 140px;
+    background: linear-gradient(45deg, #a52a2a, #d32f2f);
+    clip-path: polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%);
+    animation: rotate-roll 3s linear infinite;
+    position: relative;
+}
+
+@keyframes rotate-roll {
+    from { transform: rotateY(0deg); }
+    to { transform: rotateY(360deg); }
+}
+
+/* --- App Layout --- */
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+}
+
+header {
+    height: var(--header-h);
+    background: var(--primary);
+    color: white;
+    padding: 0 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    z-index: 100;
+}
+
+#main-nav { display: flex; gap: 8px; }
+#main-nav button { padding: 6px 12px; font-size: 0.9rem; }
+
+main#content {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+/* --- POS Responsive Layout --- */
+.pos-container {
+    display: flex;
+    height: 100%;
+    width: 100%;
+}
+
+.catalog-side {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #eee;
+    min-width: 0;
+}
+
+.order-side {
+    width: 350px;
+    background: white;
+    border-left: 1px solid #ddd;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+}
+
+/* Mobile Toggle Styles */
+#pos-mobile-toggle {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    z-index: 1000;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+/* Adaptación para móviles */
+@media (max-width: 800px) {
+    .order-side {
+        position: fixed;
+        top: var(--header-h);
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        z-index: 900;
+        transform: translateX(100%);
+        border-left: none;
+    }
+    
+    .order-side.mobile-active {
+        transform: translateX(0);
+    }
+
+    #pos-mobile-toggle {
+        display: flex;
+    }
+
+    .products-grid {
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        padding: 8px;
+        gap: 8px;
+    }
+
+    .tab {
+        padding: 6px 12px;
+        font-size: 0.85rem;
+    }
+}
+
+.category-tabs {
+    display: flex;
+    padding: 10px;
+    gap: 8px;
+    overflow-x: auto;
+    background: white;
+    flex-shrink: 0;
+    -webkit-overflow-scrolling: touch;
+}
+
+.tab {
+    padding: 8px 16px;
+    border-radius: 20px;
+    background: #f0f0f0;
+    white-space: nowrap;
+    border: 1px solid #ddd;
+    touch-action: pan-x; /* Permite scroll horizontal */
+}
+
+.tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+.products-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+    padding: 10px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.product-card {
+    background: white;
+    padding: 12px;
+    border-radius: var(--radius);
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    aspect-ratio: 1/1;
+    touch-action: pan-y; /* Permite scroll vertical */
+}
+
+.product-card .price { color: var(--primary); font-weight: bold; margin-top: 5px; }
+
+/* --- Lista de Pedido (Scrollable) --- */
+#platos-lista {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.plato-card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: var(--radius);
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.plato-card.active { border: 2px solid var(--accent); background: #fffdf9; }
+
+/* --- Switches y Toggles --- */
+.switch-group {
+    display: flex;
+    gap: 15px;
+    padding: 10px;
+    background: #f9f9f9;
+    border-top: 1px solid #eee;
+}
+
+.toggle-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    background: white;
+    border: 1px solid #ddd;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.toggle-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* --- Sidebar --- */
+.sidebar {
+    position: fixed;
+    right: -280px; top: 0; width: 280px; height: 100%;
+    background: white; z-index: 2000;
+    transition: right 0.3s ease;
+    box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+}
+.sidebar.active { right: 0; }
+
+.hidden { display: none !important; }
+
+/* Asegurar que el splash no bloquee clics si falla la clase hidden */
+#splash-screen {
+    pointer-events: none;
+}
+#splash-screen.active {
+    pointer-events: all;
+}
+
+.scrollable-x {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+}
+
+.scrollable-y {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+}
+
+/* --- Animaciones de Radar --- */
+.radar-ping {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    border: 4px solid var(--primary);
+    border-radius: 50%;
+    animation: radar-pulse 2s infinite;
+    opacity: 0;
+}
+
+@keyframes radar-pulse {
+    0% { transform: scale(0.5); opacity: 1; }
+    100% { transform: scale(2); opacity: 0; }
+}
+
+.device-item {
+    transition: transform 0.2s;
+}
+.device-item:active {
+    transform: scale(0.95);
+}
+.btn-type {
+    flex: 1; padding: 10px; background: white; border: 1px solid #ddd; font-size: 0.8rem;
+}
+.btn-type.active { background: var(--primary); color: white; }

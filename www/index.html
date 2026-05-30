@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TaqueriaPOS Premium</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- 1. Splash Screen Animado -->
+    <div id="splash-screen">
+        <div class="fire-container"></div>
+        <div class="pastor-roll"></div>
+        <div class="splash-text">TAQUERÍA POS</div>
+    </div>
+
+    <!-- 2. Pantalla de Selección de Rol -->
+    <div id="setup-screen" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg-dark); display:flex; justify-content:center; align-items:center; z-index:9000;">
+        <div style="background:white; padding:40px; border-radius:var(--radius); text-align:center; max-width:400px; width:90%;">
+            <h2 style="margin-bottom:20px; color:var(--primary);">Configuración Inicial</h2>
+            <p style="margin-bottom:30px; color:#666;">Selecciona el rol de este dispositivo:</p>
+            <button class="btn-primary" style="width:100%; padding:20px; margin-bottom:15px; font-size:1.1rem;" onclick="sync.setRole('caja')">ES LA CAJA (Principal)</button>
+            <button class="btn-secondary" style="width:100%; padding:20px; font-size:1.1rem; border:2px solid var(--primary);" onclick="sync.setRole('mesero')">SOY MESERO (Conectar)</button>
+        </div>
+    </div>
+
+    <!-- 3. Aplicación Principal -->
+    <div id="app" class="hidden">
+        <header>
+            <div style="display:flex; align-items:center; gap:15px;">
+                <div id="btn-sidebar-toggle" style="font-size:1.5rem; cursor:pointer;" onclick="router.toggleSidebar()">☰</div>
+                <div>
+                    <h1 id="taqueria-name-display" style="margin:0; font-size: 1.2rem; letter-spacing:1px;">TaqueriaPOS</h1>
+                    <small id="sync-status" style="opacity:0.8;">Iniciando...</small>
+                </div>
+            </div>
+            <nav id="main-nav">
+                <!-- Se llena dinámicamente según rol -->
+            </nav>
+        </header>
+        
+        <main id="content">
+            <!-- Vistas dinámicas -->
+        </main>
+
+        <!-- Sidebar Administrativo -->
+        <div id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h3>ADMINISTRACIÓN</h3>
+                <span onclick="router.toggleSidebar()" style="cursor:pointer; font-size:1.5rem;">×</span>
+            </div>
+            <div class="sidebar-menu" id="sidebar-menu">
+                <!-- Items de menú admin -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Notificaciones -->
+    <div id="notificaciones" class="hidden" style="position:fixed; bottom:20px; right:20px; z-index:10000; background:var(--accent); color:white; padding:15px 25px; border-radius:var(--radius); box-shadow:var(--shadow);"></div>
+
+    <!-- Scripts -->
+    <script src="cordova.js"></script>
+    <script src="js/jspdf.umd.min.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/printer.js"></script>
+    <script src="js/sync.js"></script>
+    <script src="js/router.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
