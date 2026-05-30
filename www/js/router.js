@@ -174,12 +174,6 @@ const router = {
                 <button class="btn-accent" onclick="router.nuevoPlato()" style="padding:4px 10px;">+ Plato</button>
             </div>
             <div id="platos-lista" class="scrollable-y" style="flex:1;"></div>
-            <div class="switch-group" style="padding:8px; gap:8px;">
-                <button class="toggle-btn ${this.ordenActual.platos[this.currentPlatoIdx].sinCebolla ? 'active' : ''}" onclick="router.toggleSwitch('sinCebolla')">S/ Ceb</button>
-                <button class="toggle-btn ${this.ordenActual.platos[this.currentPlatoIdx].sinCilantro ? 'active' : ''}" onclick="router.toggleSwitch('sinCilantro')">S/ Cil</button>
-                <button class="toggle-btn ${this.ordenActual.platos[this.currentPlatoIdx].sinVerdura ? 'active' : ''}" onclick="router.toggleSwitch('sinVerdura')">S/ Ver</button>
-                <button class="btn-secondary" style="background:#ff4444; color:white; border:none; padding:8px;" onclick="router.eliminarPlatoActual()">🗑️</button>
-            </div>
             <div style="padding:15px; border-top:1px solid #ddd; background:#f9f9f9;">
                 <div id="order-total" style="font-size:1.4rem; font-weight:bold; text-align:right; margin-bottom:10px;">Total: $0</div>
                 <div style="display:flex; gap:10px;">
@@ -324,33 +318,71 @@ const router = {
         if (!container) return;
         container.innerHTML = this.ordenActual.platos.map((pl, idx) => `
             <div class="plato-card ${idx === this.currentPlatoIdx ? 'active' : ''}" onclick="router.selectPlato(${idx})">
-                <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:5px;">
+                <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:8px;">
                     <b>PLATO ${idx + 1}</b>
-                    <span>${pl.sinCebolla ? '🔴 S/Ceb' : ''} ${pl.sinCilantro ? '🟢 S/Cil' : ''} ${pl.sinVerdura ? '🟤 S/Ver' : ''}</span>
+                    <span style="color:red; font-size:1.1rem; cursor:pointer;" onclick="event.stopPropagation(); router.eliminarPlatoEspecifico(${idx})">🗑️</span>
                 </div>
+                
                 ${pl.items.map((it, i) => `
-                    <div style="display:flex; justify-content:space-between; font-size:0.9rem; padding:4px 0; border-bottom:1px solid #eee;">
+                    <div style="display:flex; justify-content:space-between; font-size:0.9rem; padding:6px 0; border-bottom:1px solid #eee;">
                         <span><b>${it.cantidad}x</b> ${it.nombre} <small style="color:#777;">${it.carneId ? it.carneId.toUpperCase() : ''} ${it.conQueso ? '+Q' : ''}</small></span>
                         <div style="display:flex; gap:10px; align-items:center;">
                             <span>$${(it.precio * it.cantidad).toFixed(2)}</span>
-                            <span style="color:red; font-size:1.1rem; cursor:pointer;" onclick="event.stopPropagation(); router.eliminarItem(${i})">×</span>
+                            <span style="color:red; font-size:1.2rem; cursor:pointer;" onclick="event.stopPropagation(); router.eliminarItem(${i})">×</span>
                         </div>
                     </div>
                 `).join('')}
+
+                <div class="plato-switches">
+                    <button class="toggle-btn ${pl.sinCebolla ? 'active' : ''}" onclick="event.stopPropagation(); router.toggleSwitch(${idx}, 'sinCebolla')">S/ Ceb</button>
+                    <button class="toggle-btn ${pl.sinCilantro ? 'active' : ''}" onclick="event.stopPropagation(); router.toggleSwitch(${idx}, 'sinCilantro')">S/ Cil</button>
+                    <button class="toggle-btn ${pl.sinVerdura ? 'active' : ''}" onclick="event.stopPropagation(); router.toggleSwitch(${idx}, 'sinVerdura')">S/ Ver</button>
+                </div>
+
+                <input type="text" class="plato-nota" placeholder="Nota (ej: Bien dorado, sin salsa...)" 
+                       value="${pl.notas || ''}" 
+                       onclick="event.stopPropagation()"
+                       oninput="router.updatePlatoNota(${idx}, this.value)">
             </div>
         `).join('');
         this.updateTotal();
     },
 
-    selectPlato(idx) { this.currentPlatoIdx = idx; this.renderOrderPanel(); },
+    selectPlato(idx) { 
+        this.currentPlatoIdx = idx; 
+        // Solo refrescamos la lista para mostrar el estado activo, no todo el panel
+        const cards = document.querySelectorAll('.plato-card');
+        cards.forEach((c, i) => c.classList.toggle('active', i === idx));
+    },
+
+    updatePlatoNota(idx, val) {
+        this.ordenActual.platos[idx].notas = val;
+    },
+
+    eliminarPlatoEspecifico(idx) {
+        if (this.ordenActual.platos.length > 1) {
+            this.ordenActual.platos.splice(idx, 1);
+            this.currentPlatoIdx = Math.max(0, this.currentPlatoIdx - 1);
+            this.renderOrderPanel();
+        } else {
+            this.ordenActual.platos[0].items = [];
+            this.ordenActual.platos[0].sinCebolla = false;
+            this.ordenActual.platos[0].sinCilantro = false;
+            this.ordenActual.platos[0].sinVerdura = false;
+            this.ordenActual.platos[0].notas = '';
+            this.refreshOrderList();
+        }
+    },
+
     nuevoPlato() { 
         this.ordenActual.platos.push({ items: [], sinCebolla: false, sinCilantro: false, sinVerdura: false, notas: '' }); 
         this.currentPlatoIdx = this.ordenActual.platos.length - 1; 
         this.renderOrderPanel(); 
     },
-    toggleSwitch(field) { 
-        this.ordenActual.platos[this.currentPlatoIdx][field] = !this.ordenActual.platos[this.currentPlatoIdx][field]; 
-        this.renderOrderPanel(); 
+
+    toggleSwitch(idx, field) { 
+        this.ordenActual.platos[idx][field] = !this.ordenActual.platos[idx][field]; 
+        this.refreshOrderList(); 
     },
     setOrderType(type) { 
         this.orderType = type; 
