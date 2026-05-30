@@ -21,7 +21,10 @@ Sistema de punto de venta (POS) offline para una taquería. Gestión de ventas, 
 - **Otros:** Quesadillas, lonches, volcanes, papa rellena.
 - **Bebidas:** Aguas (Jamaica/Horchata 1L/0.5L), Refrescos (Coca 0.5L).
 
-## Estado del Proyecto: DESARROLLO AVANZADO (Actualizado 29/05/2026 - Versión Final)
+## Estado del Proyecto: DESARROLLO ACTIVO (Sincronización Git)
+- [x] Repositorio Git configurado y vinculado a GitHub (Privado).
+- [x] Respaldo de Memoria (MEMORY.md incluido en Git).
+- [x] Flujo de trabajo automatizado: Commit y Push después de cada cambio validado.
 - [x] Seguridad: Dual PIN (Admin/Staff) activo y funcional.
 - [x] Robustez: Cola de sincronización offline operativa.
 - [x] Precios: Sistema flexible de "Extras Premium" configurable en Ajustes.
@@ -29,11 +32,10 @@ Sistema de punto de venta (POS) offline para una taquería. Gestión de ventas, 
 - [x] UI/UX: Restauración de Constructor de Mesas (Croquis) y área de Personal (HRM).
 - [x] Analíticas: Métricas de rendimiento por tipo de carne en Dashboard.
 
-## Análisis Técnico (Sesión 29/05/2026 - Cierre)
-- **Precios Dinámicos:** Se implementó una lógica donde el sistema detecta "Tacos Caros" y permite configurar recargos específicos para órdenes premium en la sección de Ajustes.
-- **Croquis:** Se recuperó la interactividad para mover mesas (drag & drop) y cambiar formas (cuadrada/redonda/rect) con un toque.
-- **HRM:** El área de personal ya permite gestionar roles y pagos diarios, integrando los sueldos al flujo de gastos del turno.
-- **Dashboard:** Se habilitó el scroll vertical y se añadió una tabla de métricas que identifica qué carnes generan mayor ingreso y volumen.
+## Análisis Técnico (Actualización 30/05/2026)
+- **Control de Versiones:** Se utiliza un enfoque de "Continuous Sync" para evitar pérdida de datos, especialmente ante el próximo formateo de la máquina del usuario.
+- **Instrucciones:** `GEMINI.md` contiene ahora el mandato de sincronización automática.
+- **Respaldo:** El repositorio privado en GitHub sirve como "nube" para el proyecto y la memoria del agente.
 
 ## Próximos Pasos Identificados
 1. **QR Dinámico:** Generar el QR de pago basado en los datos bancarios de la configuración.
