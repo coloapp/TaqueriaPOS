@@ -440,23 +440,64 @@ const router = {
 
     renderMesas() {
         const content = document.getElementById('content');
-        content.innerHTML = `<div style="padding:15px; height:100%; display:flex; flex-direction:column;"><h2 style="color:var(--primary); margin-bottom:15px;">Mesas</h2><div style="flex:1; position:relative; background:#f0f0f0; border-radius:var(--radius); overflow:auto;" id="mapa-mesas" class="scrollable-y"></div></div>`;
+        content.innerHTML = `
+            <div style="padding:15px; height:100%; display:flex; flex-direction:column; background:#eee;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h2 style="color:var(--primary); margin:0;">📍 Mesas Disponibles</h2>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-secondary" style="font-size:0.8rem; padding:8px 15px;" onclick="router.navigate('admin_croquis')">✏️ Mapa</button>
+                    </div>
+                </div>
+                <div style="flex:1; position:relative; background:white; border-radius:20px; overflow:auto; box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);" id="mapa-mesas" class="scrollable-y"></div>
+                <div style="padding:15px; display:flex; gap:20px; justify-content:center; font-size:0.8rem; font-weight:bold;">
+                    <span style="display:flex; align-items:center; gap:5px;"><div style="width:12px; height:12px; background:white; border:1px solid #ddd; border-radius:3px;"></div> Libre</span>
+                    <span style="display:flex; align-items:center; gap:5px;"><div style="width:12px; height:12px; background:var(--primary); border-radius:3px;"></div> Ocupada</span>
+                    <span style="display:flex; align-items:center; gap:5px;"><div style="width:12px; height:12px; background:var(--accent); border-radius:3px;"></div> Cuenta Pedida</span>
+                </div>
+            </div>
+        `;
         const container = document.getElementById('mapa-mesas');
         db.mesas.forEach(mesa => {
             const pedido = db.pedidosActivos.find(p => p.mesaId === mesa.id);
-            let color = 'white'; let textColor = 'black';
-            if (pedido) { color = pedido.estado === 'cuenta_pedida' ? 'var(--accent)' : 'var(--primary)'; textColor = 'white'; }
+            let color = 'white'; let textColor = 'black'; let border = '1px solid #ddd';
+            
+            if (pedido) { 
+                color = pedido.estado === 'cuenta_pedida' ? 'var(--accent)' : 'var(--primary)'; 
+                textColor = 'white'; 
+                border = 'none';
+            }
+
             const div = document.createElement('div');
-            div.style = `position:absolute; left:${mesa.x}px; top:${mesa.y}px; width:${mesa.ancho}px; height:${mesa.alto}px; background:${color}; color:${textColor}; border-radius:${mesa.forma==='redonda'?'50%':'8px'}; display:flex; justify-content:center; align-items:center; font-weight:bold; box-shadow:var(--shadow); cursor:pointer; border:1px solid #ddd;`;
-            div.innerText = mesa.numero;
+            div.style = `position:absolute; left:${mesa.x}px; top:${mesa.y}px; width:${mesa.ancho}px; height:${mesa.alto}px; background:${color}; color:${textColor}; border-radius:${mesa.forma==='redonda'?'50%':'12px'}; display:flex; flex-direction:column; justify-content:center; align-items:center; font-weight:bold; box-shadow:var(--shadow); cursor:pointer; border:${border}; transition: transform 0.2s;`;
+            
+            div.innerHTML = `
+                <span style="font-size:1.2rem;">${mesa.numero}</span>
+                ${pedido ? `<span style="font-size:0.6rem; margin-top:2px;">$${db.calcularTotal(pedido).toFixed(0)}</span>` : ''}
+            `;
+
             div.onclick = () => {
-                this.currentMesa = mesa; this.orderType = 'mesa';
-                if (pedido) { this.ordenActual = JSON.parse(JSON.stringify(pedido)); this.currentPlatoIdx = this.ordenActual.platos.length - 1; }
-                else { this.ordenActual = { platos: [{ items: [], sinCebolla: false, sinCilantro: false, sinVerdura: false, notas: '' }] }; this.currentPlatoIdx = 0; }
+                this.currentMesa = mesa; 
+                this.orderType = 'mesa';
+                if (pedido) { 
+                    this.ordenActual = JSON.parse(JSON.stringify(pedido)); 
+                    this.currentPlatoIdx = this.ordenActual.platos.length - 1; 
+                } else { 
+                    this.ordenActual = { platos: [{ items: [], sinCebolla: false, sinCilantro: false, sinVerdura: false, notas: '' }] }; 
+                    this.currentPlatoIdx = 0; 
+                }
                 this.navigate('pos');
             };
             container.appendChild(div);
         });
+    },
+
+    // Mejoras en el panel de pedido para Meseros
+    pedirCuentaMesa() {
+        if (!this.ordenActual.id) return;
+        if (confirm("¿Solicitar cuenta para esta mesa?")) {
+            this.ordenActual.estado = 'cuenta_pedida';
+            this.enviarOrden(); // Re-enviar para actualizar estado
+        }
     },
 
     // --- CAJA ---
