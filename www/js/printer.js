@@ -118,15 +118,15 @@ const printer = {
         return t;
     },
 
-    async sendToPrinter(rawData, pedido = null, type = 'ticket') {
+    async sendToPrinter(rawData, pedido = null, type = 'ticket', silent = false) {
         console.log("--- ENVIANDO A IMPRESORA (" + db.config.ticketWidth + ") ---");
         
         // Si estamos en Chrome/Navegador o no hay MAC, ofrecer ticket virtual
         if (!window.Capacitor || !window.Capacitor.isNativePlatform() || !db.config.bluetoothMAC) {
-            if (pedido) {
+            if (pedido && !silent) {
                 this.showVirtualTicket(pedido, type);
-            } else {
-                app.showNotification("⚠️ Impresora no configurada. Usando ticket virtual.");
+            } else if (!pedido && !silent) {
+                app.showNotification("⚠️ Impresora no configurada.");
             }
             return;
         }
