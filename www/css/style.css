@@ -114,16 +114,16 @@ main#content {
 
 .order-side {
     position: fixed;
-    top: var(--header-h);
+    top: 0; /* Cambio: Desde arriba de todo */
     right: 0;
     bottom: 0;
     width: 380px;
-    max-width: 90%;
+    max-width: 92%;
     background: white;
     display: flex;
     flex-direction: column;
-    z-index: 1500;
-    box-shadow: -5px 0 25px rgba(0,0,0,0.15);
+    z-index: 2500; /* Por encima del header */
+    box-shadow: -5px 0 25px rgba(0,0,0,0.25);
     transform: translateX(100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -132,14 +132,38 @@ main#content {
     transform: translateX(0);
 }
 
+/* Reducción de tamaños en el footer del pedido */
+.order-footer {
+    padding: 12px 15px;
+    border-top: 1px solid #ddd;
+    background: white;
+    box-shadow: 0 -5px 15px rgba(0,0,0,0.05);
+    flex-shrink: 0;
+}
+
+#order-total {
+    font-size: 1.1rem; /* Más pequeño */
+    font-weight: bold;
+    text-align: right;
+    margin-bottom: 8px;
+    color: var(--primary);
+}
+
+.btn-send-order {
+    padding: 12px; /* Más compacto */
+    font-weight: bold;
+    font-size: 0.9rem;
+    border-radius: 10px;
+}
+
 /* Mobile Toggle Styles */
 #pos-mobile-toggle {
     display: flex;
     position: fixed;
     bottom: 25px;
     right: 25px;
-    width: 65px;
-    height: 65px;
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
     background: var(--accent);
     color: white;
@@ -147,12 +171,12 @@ main#content {
     align-items: center;
     box-shadow: 0 6px 20px rgba(0,0,0,0.4);
     z-index: 1400;
-    font-size: 1.8rem;
+    font-size: 1.5rem;
     cursor: pointer;
     border: 3px solid white;
 }
 
-/* Adaptación para pantallas grandes */
+/* Adaptación para pantallas grandes - Ahora también respeta el full height si el usuario lo activa */
 @media (min-width: 1200px) {
     .order-side {
         position: relative;
@@ -160,9 +184,39 @@ main#content {
         transform: translateX(0);
         box-shadow: none;
         border-left: 1px solid #ddd;
-        max-width: 400px;
+        max-width: 350px;
+        z-index: 10;
     }
     #pos-mobile-toggle { display: none; }
+}
+
+#main-nav { 
+    display: flex; 
+    gap: 5px; 
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 5px 0;
+    flex: 1; /* Ocupar el espacio disponible */
+    margin-left: 10px;
+    scrollbar-width: none; /* Firefox */
+}
+#main-nav::-webkit-scrollbar { display: none; }
+
+#main-nav button { 
+    padding: 8px 15px; 
+    font-size: 0.75rem; 
+    white-space: nowrap;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+#main-nav button.active {
+    background: white;
+    color: var(--primary);
 }
 
     .tab {

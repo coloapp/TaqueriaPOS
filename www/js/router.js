@@ -348,16 +348,16 @@ const router = {
         container.innerHTML = `
             <div style="background:var(--primary); color:white; padding:15px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
                 <b style="font-size:0.9rem;">${this.orderType.toUpperCase()} ${this.currentMesa ? '#'+this.currentMesa.numero : ''}</b>
-                <div style="display:flex; gap:15px; align-items:center;">
-                    <button class="btn-accent" onclick="router.nuevoPlato()" style="padding:5px 12px; font-size:0.75rem; font-weight:bold; border-radius:8px;">+ PLATO</button>
+                <div style="display:flex; gap:12px; align-items:center;">
+                    <button class="btn-accent" onclick="router.nuevoPlato()" style="padding:4px 10px; font-size:0.7rem; font-weight:bold; border-radius:8px;">+ PLATO</button>
                     <span onclick="router.toggleMobileOrder()" style="cursor:pointer; font-size:1.8rem; font-weight:bold; padding:0 5px; line-height:1;">&gt;</span>
                 </div>
             </div>
 
-            <div style="padding:8px; background:#eee; display:flex; gap:4px; flex-shrink:0;">
-                <button class="btn-type ${this.orderType==='mesa'?'active':''}" onclick="router.setOrderType('mesa')" style="flex:1; padding:6px; font-size:0.75rem;">Mesa</button>
-                <button class="btn-type ${this.orderType==='llevar'?'active':''}" onclick="router.setOrderType('llevar')" style="flex:1; padding:6px; font-size:0.75rem;">Llevar</button>
-                <button class="btn-type ${this.orderType==='domicilio'?'active':''}" onclick="router.setOrderType('domicilio')" style="flex:1; padding:6px; font-size:0.75rem;">🛵 Dom</button>
+            <div style="padding:6px; background:#eee; display:flex; gap:4px; flex-shrink:0;">
+                <button class="btn-type ${this.orderType==='mesa'?'active':''}" onclick="router.setOrderType('mesa')" style="flex:1; padding:6px; font-size:0.7rem;">Mesa</button>
+                <button class="btn-type ${this.orderType==='llevar'?'active':''}" onclick="router.setOrderType('llevar')" style="flex:1; padding:6px; font-size:0.7rem;">Llevar</button>
+                <button class="btn-type ${this.orderType==='domicilio'?'active':''}" onclick="router.setOrderType('domicilio')" style="flex:1; padding:6px; font-size:0.7rem;">🛵 Dom</button>
             </div>
 
             <div id="cliente-data" style="padding:10px; background:white; border-bottom:1px solid #ddd; flex-shrink:0; ${this.orderType!=='domicilio'?'display:none':''}">
@@ -367,11 +367,11 @@ const router = {
 
             <div id="platos-lista" class="scrollable-y" style="flex:1; background:#f5f5f5;"></div>
 
-            <div style="padding:15px; border-top:1px solid #ddd; background:white; box-shadow: 0 -5px 15px rgba(0,0,0,0.05); flex-shrink:0;">
-                <div id="order-total" style="font-size:1.4rem; font-weight:bold; text-align:right; margin-bottom:10px; color:var(--primary);">Total: $0</div>
-                <div style="display:grid; grid-template-columns: 2fr 1fr; gap:10px;">
-                    <button class="btn-primary" style="padding:15px; font-weight:bold; font-size:1rem;" onclick="router.enviarOrden()">${isUpdate?'EXTRAS':'ENVIAR'}</button>
-                    ${isUpdate ? `<button class="btn-secondary" style="color:var(--accent); border-color:var(--accent); font-size:1.2rem;" onclick="router.pedirCuentaMesa()">📄</button>` : ''}
+            <div class="order-footer">
+                <div id="order-total">Total: $0</div>
+                <div style="display:grid; grid-template-columns: 2fr 1fr; gap:8px;">
+                    <button class="btn-primary btn-send-order" onclick="router.enviarOrden()">${isUpdate?'EXTRAS':'ENVIAR'}</button>
+                    ${isUpdate ? `<button class="btn-secondary" style="color:var(--accent); border-color:var(--accent); font-size:1.1rem; padding:5px;" onclick="router.pedirCuentaMesa()">📄</button>` : ''}
                 </div>
             </div>
         `;
