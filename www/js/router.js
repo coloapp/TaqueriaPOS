@@ -1340,13 +1340,25 @@ const router = {
                     </label>
 
                     <div style="margin-top:15px; border-left:4px solid var(--primary); padding-left:15px;">
-                        <label>MAC Impresora CAJA:</label>
-                        <input type="text" id="cf-bt" value="${db.config.bluetoothMAC || ''}" placeholder="00:11:22:33:44:55">
+                        <label><b>CONFIGURACIÓN CAJA:</b></label>
+                        <div style="display:flex; gap:10px; margin-top:5px;">
+                            <input type="text" id="cf-bt" value="${db.config.bluetoothMAC || ''}" placeholder="MAC Bluetooth o ID USB" style="flex:2;">
+                            <select id="cf-tw" style="flex:1;">
+                                <option value="58mm" ${db.config.ticketWidth==='58mm'?'selected':''}>58mm</option>
+                                <option value="80mm" ${db.config.ticketWidth==='80mm'?'selected':''}>80mm</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div id="cocina-mac-group" style="margin-top:15px; border-left:4px solid var(--accent); padding-left:15px; display: ${db.config.usarImpresoraCocina ? 'block' : 'none'};">
-                        <label>MAC Impresora COCINA:</label>
-                        <input type="text" id="cf-bt-c" value="${db.config.bluetoothMAC_Cocina || ''}" placeholder="00:11:22:33:44:55">
+                        <label><b>CONFIGURACIÓN COCINA:</b></label>
+                        <div style="display:flex; gap:10px; margin-top:5px;">
+                            <input type="text" id="cf-bt-c" value="${db.config.bluetoothMAC_Cocina || ''}" placeholder="MAC Bluetooth o ID USB" style="flex:2;">
+                            <select id="cf-tw-c" style="flex:1;">
+                                <option value="58mm" ${db.config.ticketWidth_Cocina==='58mm'?'selected':''}>58mm</option>
+                                <option value="80mm" ${db.config.ticketWidth_Cocina==='80mm'?'selected':''}>80mm</option>
+                            </select>
+                        </div>
                     </div>
                     
                     <button class="btn-primary" style="margin-top:20px;" onclick="router.guardarConfig()">GUARDAR</button>
@@ -1359,6 +1371,7 @@ const router = {
         db.config.telefono = document.getElementById('cf-t').value; 
         db.config.comisionTarjeta = parseFloat(document.getElementById('cf-c').value); 
         db.config.ticketWidth = document.getElementById('cf-tw').value; 
+        db.config.ticketWidth_Cocina = document.getElementById('cf-tw-c').value;
         db.config.bancoNombre = document.getElementById('cf-bn').value;
         db.config.bancoClabe = document.getElementById('cf-bc').value;
         db.config.bancoBeneficiario = document.getElementById('cf-bb').value;

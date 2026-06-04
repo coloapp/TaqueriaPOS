@@ -14,17 +14,19 @@ const printer = {
     SIZE_LARGE: '\u001D!1', 
     SIZE_NORMAL: '\u001D!0',
 
-    getCharsPerLine() {
-        return db.config.ticketWidth === '80mm' ? 42 : 32;
+    getCharsPerLine(type = 'caja') {
+        const width = (type === 'cocina' && db.config.usarImpresoraCocina) ? db.config.ticketWidth_Cocina : db.config.ticketWidth;
+        return width === '80mm' ? 42 : 32;
     },
 
-    drawLine() {
-        return "-".repeat(this.getCharsPerLine()) + "\n";
+    drawLine(type = 'caja') {
+        return "-".repeat(this.getCharsPerLine(type)) + "\n";
     },
 
     formatKitchenOrder(pedido) {
         const mesero = router.currentUser ? router.currentUser.nombre : 'TERMINAL';
         const esExtra = pedido.esExtra || false;
+        const chars = this.getCharsPerLine('cocina');
         
         let t = this.INIT + this.CENTER;
         t += this.BOLD_ON + this.SIZE_LARGE;
@@ -43,14 +45,13 @@ const printer = {
         t += this.SIZE_NORMAL + "MESERO: " + mesero.toUpperCase() + "\n" + this.BOLD_OFF;
         t += "FECHA: " + new Date().toLocaleTimeString() + "\n";
         
-        // Datos de contacto para Domicilio
         if (pedido.tipo === 'domicilio' && pedido.cliente) {
-            t += this.BOLD_ON + "--------------------------------\n";
+            t += this.BOLD_ON + "-".repeat(chars) + "\n";
             t += "DIR: " + (pedido.cliente.nombre || 'N/A') + "\n";
             t += "TEL: " + (pedido.cliente.tel || 'N/A') + "\n";
-            t += "--------------------------------\n" + this.BOLD_OFF;
+            t += "-".repeat(chars) + "\n" + this.BOLD_OFF;
         } else {
-            t += "================================\n";
+            t += "=".repeat(chars) + "\n";
         }
         
         t += this.LEFT;
@@ -74,7 +75,7 @@ const printer = {
             if (notasV.length > 0) t += this.BOLD_ON + ">> " + notasV.join(' ') + "\n" + this.BOLD_OFF;
             if (plato.notas) t += "NOTA: " + plato.notas + "\n";
 
-            t += "--------------------------------\n";
+            t += "-".repeat(chars) + "\n";
         });
 
         t += "\n\n\n\n" + this.GS + "V" + "\u0041" + "\u0000"; 
@@ -82,17 +83,17 @@ const printer = {
     },
 
     formatBill(pedido, conComision = false) {
-        const chars = this.getCharsPerLine();
+        const chars = this.getCharsPerLine('caja');
         const finalTotal = db.calcularTotal(pedido, conComision);
         
         let t = this.INIT + this.CENTER;
         t += this.BOLD_ON + db.config.nombreTaqueria.toUpperCase() + "\n" + this.BOLD_OFF;
         t += db.config.direccion + "\n";
         t += "Tel: " + db.config.telefono + "\n";
-        t += this.drawLine();
+        t += this.drawLine('caja');
         t += (pedido.tipo === 'mesa' ? "MESA #" + pedido.mesaNumero : "PEDIDO: " + pedido.tipo.toUpperCase()) + "\n";
         t += "FECHA: " + new Date().toLocaleString() + "\n";
-        t += this.drawLine();
+        t += this.drawLine('caja');
         t += this.LEFT;
         
         pedido.platos.forEach(pl => {
@@ -103,7 +104,7 @@ const printer = {
             });
         });
         
-        t += this.drawLine();
+        t += this.drawLine('caja');
         t += this.RIGHT + this.BOLD_ON + "TOTAL: $" + finalTotal.toFixed(2) + this.BOLD_OFF + "\n";
         
         if (db.config.bancoClabe) {
@@ -114,20 +115,23 @@ const printer = {
         }
 
         t += this.CENTER + "\n¡GRACIAS POR SU VISITA!\n";
-        t += "\n\n\n\n" + this.GS + "V" + "\u0041" + "\u0000"; // Corte de papel
+        t += "\n\n\n\n" + this.GS + "V" + "\u0041" + "\u0000"; 
         return t;
     },
 
     async sendToPrinter(rawData, pedido = null, type = 'ticket', silent = false) {
-        console.log("--- ENVIANDO A IMPRESORA (" + db.config.ticketWidth + ") ---");
+        // type puede ser 'cuenta' o 'cocina'
+        const isCocina = (type === 'cocina' && db.config.usarImpresoraCocina);
+        const ticketWidth = isCocina ? db.config.ticketWidth_Cocina : db.config.ticketWidth;
         
-        // Decidir a qué MAC enviar
-        let targetMAC = db.config.bluetoothMAC; // Default: Caja
-        if (type === 'cocina' && db.config.usarImpresoraCocina && db.config.bluetoothMAC_Cocina) {
+        console.log(`--- ENVIANDO A IMPRESORA ${type.toUpperCase()} (${ticketWidth}) ---`);
+        
+        let targetMAC = db.config.bluetoothMAC; 
+        if (isCocina && db.config.bluetoothMAC_Cocina) {
             targetMAC = db.config.bluetoothMAC_Cocina;
         }
 
-        // Si estamos en Navegador o no hay MAC configurada para el destino
+        // Simulación o Ticket Virtual si no hay entorno nativo
         if (!window.Capacitor || !window.Capacitor.isNativePlatform() || !targetMAC) {
             if (pedido && !silent) {
                 this.showVirtualTicket(pedido, type);
@@ -138,10 +142,17 @@ const printer = {
         }
 
         try {
-            // Aquí iría la lógica nativa con targetMAC
-            app.showNotification(`Imprimiendo ${type} en ${targetMAC === db.config.bluetoothMAC ? 'CAJA' : 'COCINA'}...`);
+            // Soporte USB (Preparación conceptual): 
+            // Si el targetMAC empieza con "USB:", podríamos usar un plugin de Serial/USB OTG
+            if (targetMAC.startsWith("USB:")) {
+                app.showNotification(`Imprimiendo via USB en ${isCocina ? 'COCINA' : 'CAJA'}...`);
+                // Lógica real con plugin USB/Serial aquí
+            } else {
+                app.showNotification(`Imprimiendo via Bluetooth en ${isCocina ? 'COCINA' : 'CAJA'}...`);
+                // Lógica real Bluetooth aquí
+            }
         } catch (e) {
-            console.error("Error Bluetooth:", e);
+            console.error("Error Impresión:", e);
             if (pedido && !silent) this.showVirtualTicket(pedido, type);
         }
     },

@@ -21,14 +21,15 @@ const db = {
         nombreTaqueria: 'Mi Taquería',
         direccion: '',
         telefono: '',
-        ticketWidth: '58mm',
+        ticketWidth: '58mm', // Ancho Caja
+        ticketWidth_Cocina: '58mm', // Ancho Cocina
         comisionTarjeta: 0,
         extraTacoPremium: 6,
         extraOrdenPremium: 30,
         imprimirExtras: true,
-        bluetoothMAC: '', // Impresora Caja (Default)
-        bluetoothMAC_Cocina: '', // Nueva: Impresora Cocina
-        usarImpresoraCocina: false, // Nueva: Switch para habilitar/deshabilitar
+        bluetoothMAC: '', // Impresora Caja
+        bluetoothMAC_Cocina: '', // Impresora Cocina
+        usarImpresoraCocina: false,
         pin: '1234',
         pinStaff: '0000',
         deviceId: 'DEVICE-' + Math.random().toString(36).substr(2, 9).toUpperCase()
