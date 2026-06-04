@@ -605,6 +605,116 @@ const router = {
         this.orderType = sync.role === 'caja' ? 'llevar' : 'mesa';
     },
 
+    renderMesas() {
+        const content = document.getElementById('content');
+        content.innerHTML = `
+            <div style="padding:15px; height:100%; display:flex; flex-direction:column; background:#eee;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h2 style="color:var(--primary); margin:0;">📍 Mesas Disponibles</h2>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-secondary" style="font-size:0.8rem; padding:8px 15px;" onclick="router.navigate('admin_croquis')">✏️ Mapa</button>
+                    </div>
+                </div>
+                <div style="flex:1; position:relative; background:white; border-radius:20px; overflow:auto; box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);" id="mapa-mesas" class="scrollable-y"></div>
+                <div style="padding:15px; display:flex; gap:20px; justify-content:center; font-size:0.8rem; font-weight:bold;">
+                    <span style="display:flex; align-items:center; gap:5px;"><div style="width:12px; height:12px; background:white; border:1px solid #ddd; border-radius:3px;"></div> Libre</span>
+                    <span style="display:flex; align-items:center; gap:5px;"><div style="width:12px; height:12px; background:var(--primary); border-radius:3px;"></div> Ocupada</span>
+                    <span style="display:flex; align-items:center; gap:5px;"><div style="width:12px; height:12px; background:var(--accent); border-radius:3px;"></div> Cuenta Pedida</span>
+                </div>
+            </div>
+        `;
+        const container = document.getElementById('mapa-mesas');
+        db.mesas.forEach(mesa => {
+            const pedido = db.pedidosActivos.find(p => p.mesaId === mesa.id);
+            let color = 'white'; let textColor = 'black'; let border = '1px solid #ddd';
+            
+            if (pedido) { 
+                color = pedido.estado === 'cuenta_pedida' ? 'var(--accent)' : 'var(--primary)'; 
+                textColor = 'white'; 
+                border = 'none';
+            }
+
+            const div = document.createElement('div');
+            div.style = `position:absolute; left:${mesa.x}px; top:${mesa.y}px; width:${mesa.ancho}px; height:${mesa.alto}px; background:${color}; color:${textColor}; border-radius:${mesa.forma==='redonda'?'50%':'12px'}; display:flex; flex-direction:column; justify-content:center; align-items:center; font-weight:bold; box-shadow:var(--shadow); cursor:pointer; border:${border}; transition: transform 0.2s;`;
+            
+            div.innerHTML = `
+                <span style="font-size:1.2rem;">${mesa.numero}</span>
+                ${pedido ? `<span style="font-size:0.6rem; margin-top:2px;">$${db.calcularTotal(pedido).toFixed(0)}</span>` : ''}
+            `;
+
+            div.onclick = () => {
+                this.currentMesa = mesa; 
+                this.orderType = 'mesa';
+                if (pedido) { 
+                    this.ordenActual = JSON.parse(JSON.stringify(pedido)); 
+                    this.currentPlatoIdx = this.ordenActual.platos.length - 1; 
+                } else { 
+                    this.ordenActual = { platos: [{ items: [], sinCebolla: false, sinCilantro: false, sinVerdura: false, notas: '' }] }; 
+                    this.currentPlatoIdx = 0; 
+                }
+                this.navigate('pos');
+            };
+            container.appendChild(div);
+        });
+    },
+
+    pedirCuentaMesa() {
+        if (!this.ordenActual.id) return;
+        if (confirm("¿Solicitar cuenta para esta mesa?")) {
+            this.ordenActual.estado = 'cuenta_pedida';
+            this.enviarOrden(); 
+        }
+    },
+
+    renderCaja() {
+        const content = document.getElementById('content');
+        if (!db.turnoActual) {
+            content.innerHTML = `<div style="padding:40px; text-align:center;"><h2>Caja Cerrada</h2><input type="number" id="ini-c" placeholder="$ Efectivo inicial" style="padding:12px; border-radius:10px; margin-bottom:10px; width:200px; text-align:center;"><br><button class="btn-primary" onclick="router.handleAbrirCaja(document.getElementById('ini-c').value)">ABRIR CAJA</button></div>`;
+            return;
+        }
+        
+        const mesas = db.pedidosActivos.filter(p => p.tipo === 'mesa');
+        const otros = db.pedidosActivos.filter(p => p.tipo !== 'mesa');
+        const t = db.turnoActual;
+        const efectivoActual = (t.inicioCaja + t.ventas - t.gastos - (t.retiros || 0));
+        const mostrarAlerta = efectivoActual >= 2000;
+
+        content.innerHTML = `
+            <div style="padding:15px; height:100%; display:flex; flex-direction:column;" class="scrollable-y">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h2 style="color:var(--primary); margin:0;">Caja</h2>
+                    <button class="btn-accent" style="padding:8px 15px;" onclick="router.askForPin('admin', () => router.showRetiroModal())">💸 RETIRO SEGURIDAD</button>
+                </div>
+
+                ${mostrarAlerta ? `
+                    <div style="background:#ff5252; color:white; padding:15px; border-radius:10px; margin-bottom:15px; font-weight:bold; text-align:center; animation: pulse 2s infinite;">
+                        ⚠️ EXCESO DE EFECTIVO ($${efectivoActual.toFixed(2)})<br>
+                        REALICE RETIRO PARCIAL
+                    </div>
+                ` : ''}
+
+                ${this.currentUser.puesto === 'admin' ? `
+                <div style="background:#fff9f0; padding:12px; border-radius:10px; margin-bottom:15px; border:1px solid #ffe0b2; display:flex; justify-content:space-between;">
+                    <div>En Caja: <b>$${efectivoActual.toFixed(2)}</b></div>
+                    <div style="color:#e65100;">Retiros: <b>-$${(t.retiros || 0).toFixed(2)}</b></div>
+                </div>
+                ` : ''}
+                
+                <h3 style="font-size:1rem; border-bottom:2px solid var(--primary); padding-bottom:5px;">🏠 EN MESAS</h3>
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:10px; margin-bottom:20px;">
+                    ${mesas.map(p => this.renderPedidoCajaCard(p)).join('')}
+                </div>
+
+                <h3 style="font-size:1rem; border-bottom:2px solid var(--accent); padding-bottom:5px;">🛵 LLEVAR / DOMICILIO</h3>
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:10px;">
+                    ${otros.map(p => this.renderPedidoCajaCard(p)).join('')}
+                </div>
+                
+                <button class="btn-primary" style="margin-top:30px; background:#333;" onclick="router.askForPin('admin', () => router.cerrarCajaModal())">REALIZAR CORTE FINAL</button>
+            </div>
+        `;
+    },
+
     async handleCancelarPedido(id) {
         const action = async () => {
             const motivo = prompt("Motivo de cancelación (opcional):");
@@ -1261,6 +1371,62 @@ const router = {
                             </tr>
                         `).join('')}
                     </table>
+                </div>
+            </div>
+        `;
+    },
+
+    async renderLogs() {
+        const content = document.getElementById('content');
+        const res = await db.dbConn.query("SELECT * FROM logs_auditoria ORDER BY id DESC LIMIT 200");
+        const logs = res.values || [];
+
+        content.innerHTML = `
+            <div style="padding:20px; height:100%;" class="scrollable-y">
+                <h2 style="color:var(--primary); margin-bottom:20px; font-weight:900;">Auditoría de Sistema</h2>
+                
+                <div class="admin-card" style="padding:0; overflow:hidden;">
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+                            <thead style="background:#f8f9fa; border-bottom:2px solid #eee;">
+                                <tr>
+                                    <th style="padding:15px; text-align:left; color:#888;">FECHA/HORA</th>
+                                    <th style="padding:15px; text-align:left; color:#888;">USUARIO</th>
+                                    <th style="padding:15px; text-align:left; color:#888;">ACCIÓN</th>
+                                    <th style="padding:15px; text-align:right; color:#888;">DETALLES</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${logs.map(l => `
+                                    <tr style="border-bottom:1px solid #f0f0f0;">
+                                        <td style="padding:15px; color:#666; line-height:1.2;">${l.fecha}<br><small>${l.hora}</small></td>
+                                        <td style="padding:15px;"><b>${l.usuario}</b></td>
+                                        <td style="padding:15px;"><span style="background:#fff0f0; color:var(--primary); padding:4px 8px; border-radius:6px; font-weight:bold; font-size:0.7rem;">${l.accion}</span></td>
+                                        <td style="padding:15px; text-align:right; max-width:200px; color:#555;">${l.detalles}</td>
+                                    </tr>
+                                `).join('')}
+                                ${logs.length === 0 ? '<tr><td colspan="4" style="padding:40px; text-align:center; color:#999;">Sin registros aún</td></tr>' : ''}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    renderDispositivos() {
+        const content = document.getElementById('content');
+        content.innerHTML = `
+            <div style="padding:20px; height:100%;" class="scrollable-y">
+                <h2 style="color:var(--primary); margin-bottom:20px;">Red y Dispositivos</h2>
+                <div class="admin-card">
+                    <p>ID de este dispositivo: <b>${db.config.deviceId}</b></p>
+                    <p>Rol: <b>${sync.role.toUpperCase()}</b></p>
+                    <hr>
+                    <h3>Radar de Sincronización</h3>
+                    <div id="radar-list" style="padding:10px; background:#f0f0f0; border-radius:10px; min-height:100px;">
+                        Buscando otros dispositivos en la red local...
+                    </div>
                 </div>
             </div>
         `;
