@@ -49,66 +49,85 @@ const app = {
         
         const div = document.createElement('div');
         div.id = 'activation-screen';
-        // Cambio: display block y overflow-y auto para permitir scroll con dedo
         div.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg-dark); display:block; overflow-y:auto; z-index:16000; padding: 20px 0;";
         div.innerHTML = `
-            <div style="background:white; padding:30px; border-radius:var(--radius); text-align:center; max-width:450px; width:90%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin: 20px auto;">
-                <h2 style="color:var(--primary); margin-bottom:10px;">Activar Taquería</h2>
+            <div id="step-1" style="background:white; padding:30px; border-radius:var(--radius); text-align:center; max-width:450px; width:90%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin: 20px auto;">
+                <h2 style="color:var(--primary); margin-bottom:10px;">Paso 1: Activar</h2>
                 <p style="color:#666; font-size:0.9rem; margin-bottom:25px;">Configura tu negocio para empezar.</p>
                 
                 <div style="text-align:left; margin-bottom:20px;">
                     <label style="font-size:0.75rem; font-weight:bold;">DATOS DEL LOCAL:</label>
                     <input type="text" id="cfg-tel" value="${db.config.telefono}" placeholder="Teléfono del Local" style="width:100%; padding:12px; margin-bottom:10px; border:1px solid #ddd; border-radius:8px;">
                     <input type="text" id="cfg-dir" value="${db.config.direccion}" placeholder="Dirección del Local" style="width:100%; padding:12px; margin-bottom:20px; border:1px solid #ddd; border-radius:8px;">
-                    
-                    <label style="font-size:0.75rem; font-weight:bold;">USUARIO DUEÑO/ADMIN:</label>
-                    <input type="text" id="cfg-admin-user" placeholder="Nombre de usuario admin" style="width:100%; padding:12px; margin-bottom:10px; border:1px solid var(--primary); border-radius:8px;">
-                    <input type="password" id="cfg-admin-pin" placeholder="PIN de 4 dígitos" maxlength="4" 
-                           oninput="if(this.value.length===4) document.getElementById('activation-code').focus()"
-                           style="width:100%; padding:12px; margin-bottom:20px; border:1px solid var(--primary); border-radius:8px;">
                 </div>
 
                 <div style="background:#f5f5f5; padding:15px; border-radius:10px; margin-bottom:20px; border:1px dashed #bbb;">
                     <p style="font-size:0.75rem; margin-bottom:5px; color:#777;">ID DE EQUIPO:</p>
                     <div style="font-family:monospace; font-size:1.2rem; font-weight:bold; color:var(--primary); margin-bottom:15px;">${db.config.deviceId}</div>
                     <input type="text" id="activation-code" placeholder="CÓDIGO DE ACTIVACIÓN" 
-                           oninput="if(this.value.length>=4) app.activarLicencia()"
                            style="width:100%; padding:15px; border:1px solid var(--primary); border-radius:8px; text-align:center; font-weight:bold; letter-spacing:1px;">
                 </div>
 
-                <button class="btn-primary" style="width:100%; padding:18px; font-size:1.1rem;" onclick="app.activarLicencia()">ACTIVAR Y CREAR ADMIN</button>
+                <button class="btn-primary" style="width:100%; padding:18px; font-size:1.1rem;" onclick="app.validarPaso1()">CONTINUAR A REGISTRO</button>
+            </div>
+
+            <div id="step-2" style="background:white; padding:30px; border-radius:var(--radius); text-align:center; max-width:450px; width:90%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin: 20px auto; display:none;">
+                <h2 style="color:var(--primary); margin-bottom:10px;">Paso 2: Dueño</h2>
+                <p style="color:#666; font-size:0.9rem; margin-bottom:25px;">Crea tu usuario de administrador.</p>
+                
+                <div style="text-align:left; margin-bottom:20px;">
+                    <label style="font-size:0.75rem; font-weight:bold;">USUARIO DUEÑO/ADMIN:</label>
+                    <input type="text" id="cfg-admin-user" placeholder="Nombre de usuario admin" style="width:100%; padding:12px; margin-bottom:10px; border:1px solid var(--primary); border-radius:8px;">
+                    <label style="font-size:0.75rem; font-weight:bold;">PIN DE SEGURIDAD:</label>
+                    <input type="password" id="cfg-admin-pin" placeholder="PIN de 4 dígitos" maxlength="4" 
+                           inputmode="numeric" pattern="[0-9]*"
+                           oninput="if(this.value.length===4) app.finalizarActivacion()"
+                           style="width:100%; padding:12px; margin-bottom:20px; border:1px solid var(--primary); border-radius:8px; text-align:center; font-size:1.5rem; letter-spacing:10px;">
+                </div>
+
+                <button class="btn-primary" style="width:100%; padding:18px; font-size:1.1rem;" onclick="app.finalizarActivacion()">FINALIZAR Y ENTRAR</button>
             </div>
         `;
         document.body.appendChild(div);
     },
 
-    async activarLicencia() {
-        const tel = document.getElementById('cfg-tel').value;
-        const dir = document.getElementById('cfg-dir').value;
-        const code = document.getElementById('activation-code').value;
+    async validarPaso1() {
+        const code = document.getElementById('activation-code').value.trim();
+        if (!code) return alert("Ingresa el código de activación");
+
+        if (await db.verificarActivacion(code)) {
+            // Guardar datos temporales del local
+            db.config.telefono = document.getElementById('cfg-tel').value;
+            db.config.direccion = document.getElementById('cfg-dir').value;
+            
+            document.getElementById('step-1').style.display = 'none';
+            document.getElementById('step-2').style.display = 'block';
+            document.getElementById('cfg-admin-user').focus();
+        } else {
+            alert("❌ CÓDIGO INCORRECTO\nPor favor verifica tu ID de equipo y el código proporcionado.");
+        }
+    },
+
+    async finalizarActivacion() {
         const adminUser = document.getElementById('cfg-admin-user').value.trim();
         const adminPin = document.getElementById('cfg-admin-pin').value;
 
         if (!adminUser || !adminPin || adminPin.length < 4) {
-            alert("Define un usuario y PIN de administrador (4 dígitos)");
-            return;
+            // No alertar si se activa por oninput (length=4) pero aún no termina
+            if (event && event.type === 'input' && adminPin.length < 4) return;
+            if (adminPin.length === 4) { /* adelante */ } 
+            else { alert("Define un usuario y PIN de 4 dígitos"); return; }
         }
 
-        if (await db.verificarActivacion(code)) {
-            db.config.telefono = tel;
-            db.config.direccion = dir;
-            db.config.pin = adminPin; 
-            await db.save();
-            
-            await db.addEmpleado(adminUser, 'admin', 0, adminPin);
-            
-            app.showNotification("¡SISTEMA ACTIVADO!");
-            const screen = document.getElementById('activation-screen');
-            if(screen) screen.remove();
-            this.startUI('caja');
-        } else {
-            alert("Código incorrecto");
-        }
+        db.config.pin = adminPin; 
+        await db.save();
+        
+        await db.addEmpleado(adminUser, 'admin', 0, adminPin);
+        
+        app.showNotification("¡SISTEMA ACTIVADO!");
+        const screen = document.getElementById('activation-screen');
+        if(screen) screen.remove();
+        this.startUI('caja');
     },
 
     showNotification(msg) {
