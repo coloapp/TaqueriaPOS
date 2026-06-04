@@ -372,73 +372,89 @@ main#content {
     border-color: #ffcdd2;
 }
 
-/* --- Responsividad Mejorada --- */
-@media (max-width: 768px) {
-    .pos-container {
-        flex-direction: column;
-    }
-    .catalog-side {
-        width: 100%;
-        height: auto;
-        flex: 1;
-    }
-    .order-side {
-        position: fixed;
-        right: -100%;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 3000;
-        background: white;
-        transition: right 0.3s ease;
-    }
-    .order-side.mobile-active {
-        right: 0;
-    }
-    #pos-mobile-toggle {
-        display: flex;
-    }
-    .products-grid {
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-        gap: 8px;
-        padding: 10px;
-    }
-    .product-card {
-        padding: 10px;
-        font-size: 0.8rem;
-    }
-    .category-tabs {
-        padding: 5px;
-        height: auto;
-        flex-wrap: nowrap;
-        justify-content: flex-start;
-    }
-    .tab {
-        padding: 8px 12px;
-        font-size: 0.75rem;
-    }
-    .sidebar {
-        width: 85%;
-        right: -85%;
-    }
+/* --- UI Mesero Móvil Optimizado --- */
+.category-carousel {
+    display: flex;
+    overflow-x: auto;
+    padding: 10px;
+    gap: 10px;
+    background: white;
+    border-bottom: 1px solid #eee;
+    -webkit-overflow-scrolling: touch;
+}
+.category-card {
+    flex: 0 0 100px;
+    background: #f5f5f5;
+    padding: 12px 5px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+}
+.category-card.active {
+    background: #fff5f5;
+    border-color: var(--primary);
+    color: var(--primary);
 }
 
-#pos-mobile-toggle {
-    display: none;
+.quick-actions-bar {
+    display: flex;
+    gap: 8px;
+    padding: 10px;
+    background: #f9f9f9;
+    border-top: 1px solid #eee;
+}
+.btn-quick {
+    flex: 1;
+    padding: 10px 5px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    background: white;
+    font-size: 0.7rem;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+.btn-quick.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.floating-actions {
     position: fixed;
     bottom: 25px;
     right: 25px;
-    width: 65px;
-    height: 65px;
-    background: var(--accent);
-    color: white;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    z-index: 3100;
+}
+.btn-float {
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
+    display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 1.8rem;
-    box-shadow: 0 4px 15px rgba(255,152,0,0.5);
-    z-index: 3100;
+    font-size: 1.5rem;
+    color: white;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     cursor: pointer;
+}
+.btn-float.cart { background: var(--accent); }
+.btn-float.add-plato { background: #4CAF50; }
+
+.user-header {
+    background: var(--primary);
+    color: white;
+    padding: 10px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: bold;
 }
 
 /* --- Login Screen Styles --- */

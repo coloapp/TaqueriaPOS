@@ -24,16 +24,35 @@ const printer = {
 
     formatKitchenOrder(pedido) {
         const mesero = router.currentUser ? router.currentUser.nombre : 'TERMINAL';
-        const chars = this.getCharsPerLine();
         const esExtra = pedido.esExtra || false;
         
         let t = this.INIT + this.CENTER;
         t += this.BOLD_ON + this.SIZE_LARGE;
-        t += (esExtra ? "!!! EXTRAS !!!\n" : "");
-        t += (pedido.tipo === 'mesa' ? "MESA " + pedido.mesaNumero : pedido.tipo.toUpperCase()) + "\n";
+        
+        // Encabezado según tipo de orden
+        if (pedido.tipo === 'mesa') {
+            t += "MESA #" + pedido.mesaNumero + "\n";
+        } else if (pedido.tipo === 'llevar') {
+            t += "PARA LLEVAR #" + pedido.id.toString().slice(-4) + "\n";
+        } else if (pedido.tipo === 'domicilio') {
+            t += "DOMICILIO #" + pedido.id.toString().slice(-4) + "\n";
+        }
+        
+        if (esExtra) t += "!!! EXTRAS !!!\n";
+        
         t += this.SIZE_NORMAL + "MESERO: " + mesero.toUpperCase() + "\n" + this.BOLD_OFF;
         t += "FECHA: " + new Date().toLocaleTimeString() + "\n";
-        t += "================================\n"; // Raya de inicio (el papelito)
+        
+        // Datos de contacto para Domicilio
+        if (pedido.tipo === 'domicilio' && pedido.cliente) {
+            t += this.BOLD_ON + "--------------------------------\n";
+            t += "DIR: " + (pedido.cliente.nombre || 'N/A') + "\n";
+            t += "TEL: " + (pedido.cliente.tel || 'N/A') + "\n";
+            t += "--------------------------------\n" + this.BOLD_OFF;
+        } else {
+            t += "================================\n";
+        }
+        
         t += this.LEFT;
 
         pedido.platos.forEach((plato, i) => {
@@ -42,8 +61,6 @@ const printer = {
             t += this.BOLD_ON + "PLATO " + (i + 1) + "\n" + this.BOLD_OFF;
             
             plato.items.forEach(it => {
-                // Si es un pedido de extras, podríamos marcar los nuevos. 
-                // Por ahora imprimimos el plato completo con el formato de raya.
                 t += this.SIZE_LARGE + it.cantidad + " " + it.nombre.toUpperCase();
                 if (it.carneId) t += " (" + it.carneId.toUpperCase() + ")";
                 t += this.SIZE_NORMAL + "\n";
@@ -57,10 +74,10 @@ const printer = {
             if (notasV.length > 0) t += this.BOLD_ON + ">> " + notasV.join(' ') + "\n" + this.BOLD_OFF;
             if (plato.notas) t += "NOTA: " + plato.notas + "\n";
 
-            t += "--------------------------------\n"; // Raya divisoria horizontal entre platos
+            t += "--------------------------------\n";
         });
 
-        t += "\n\n\n\n" + this.GS + "V" + "\u0041" + "\u0000"; // Corte de papel
+        t += "\n\n\n\n" + this.GS + "V" + "\u0041" + "\u0000"; 
         return t;
     },
 

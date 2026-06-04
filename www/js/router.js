@@ -183,7 +183,6 @@ const router = {
         if (input) input.value = this._loginPinBuffer.replace(/./g, '*');
     },
 
-    // --- POS (Punto de Venta) ---
     renderPOS() {
         if (!db.turnoActual && sync.role === 'caja') {
             this.navigate('caja');
@@ -193,52 +192,90 @@ const router = {
 
         const content = document.getElementById('content');
         content.innerHTML = `
+            <div class="user-header">
+                <span>👤 ${this.currentUser ? this.currentUser.nombre : 'Invitado'} (${this.currentUser ? this.currentUser.puesto.toUpperCase() : ''})</span>
+                <span id="pos-mesa-info">${this.currentMesa ? 'MESA #' + this.currentMesa.numero : this.orderType.toUpperCase()}</span>
+            </div>
+            
+            <div class="category-carousel" id="category-carousel"></div>
+            
             <div class="pos-container" id="pos-container">
                 <div class="catalog-side">
-                    <div class="category-tabs" id="category-tabs"></div>
                     <div class="products-grid scrollable-y" id="products-grid"></div>
+                    
+                    <div class="quick-actions-bar" id="quick-actions">
+                        <button class="btn-quick" id="qa-ceb" onclick="router.toggleQuickSwitch('sinCebolla')">S/ CEBOLLA</button>
+                        <button class="btn-quick" id="qa-cil" onclick="router.toggleQuickSwitch('sinCilantro')">S/ CILANTRO</button>
+                        <button class="btn-quick" id="qa-ver" onclick="router.toggleQuickSwitch('sinVerdura')">S/ VERDURA</button>
+                    </div>
                 </div>
+                
                 <div class="order-side" id="order-side"></div>
             </div>
+
+            <div class="floating-actions">
+                <div class="btn-float add-plato" onclick="router.nuevoPlato()">🍽️+</div>
+                <div class="btn-float cart" onclick="router.toggleMobileOrder()" id="cart-float-btn">🛒</div>
+            </div>
         `;
-        this.renderTabs();
+        
+        this.renderCategories();
         this.renderProducts();
         this.renderOrderPanel();
+        this.updateQuickActionsUI();
     },
 
-    renderTabs() {
-        const container = document.getElementById('category-tabs');
+    renderCategories() {
+        const container = document.getElementById('category-carousel');
         if (!container) return;
-        container.innerHTML = '';
-        db.categorias.forEach(cat => {
-            const btn = document.createElement('button');
-            btn.className = `tab ${this.currentCategory === cat ? 'active' : ''}`;
-            btn.innerText = cat;
-            btn.onclick = () => { this.currentCategory = cat; this.renderTabs(); this.renderProducts(); };
-            container.appendChild(btn);
-        });
+        container.innerHTML = db.categorias.map(cat => `
+            <div class="category-card ${this.currentCategory === cat ? 'active' : ''}" 
+                 onclick="router.selectCategory('${cat}')">
+                <div style="font-size:1.2rem; margin-bottom:5px;">${cat === 'Tacos' ? '🌮' : (cat === 'Bebidas' ? '🥤' : '✨')}</div>
+                ${cat.toUpperCase()}
+            </div>
+        `).join('');
     },
 
-    renderProducts() {
-        const container = document.getElementById('products-grid');
-        if (!container) return;
-        container.innerHTML = '';
+    selectCategory(cat) {
+        this.currentCategory = cat;
+        this.renderCategories();
+        this.renderProducts();
+    },
+
+    toggleQuickSwitch(field) {
+        const plato = this.ordenActual.platos[this.currentPlatoIdx];
+        plato[field] = !plato[field];
+        this.updateQuickActionsUI();
+        this.refreshOrderList();
+    },
+
+    updateQuickActionsUI() {
+        const plato = this.ordenActual.platos[this.currentPlatoIdx];
+        if (!plato) return;
+        document.getElementById('qa-ceb').classList.toggle('active', plato.sinCebolla);
+        document.getElementById('qa-cil').classList.toggle('active', plato.sinCilantro);
+        document.getElementById('qa-ver').classList.toggle('active', plato.sinVerdura);
+    },
+
+    _lastClickTime: 0,
+    _lastProdId: null,
+
+    addToOrder(prod) {
+        const now = Date.now();
+        const isDoubleClick = (now - this._lastClickTime < 300) && (this._lastProdId === prod.id);
         
-        const prods = db.productos.filter(p => p.categoria === this.currentCategory);
-        prods.forEach(p => {
-            const card = document.createElement('div');
-            const isCaro = p.categoria === 'Tacos' && p.precio > 19; 
-            card.className = `product-card ${isCaro ? 'caro' : ''}`;
-            
-            card.innerHTML = `
-                ${isCaro ? '<div style="position:absolute; top:5px; right:5px; background:var(--primary); color:white; font-size:0.6rem; padding:2px 5px; border-radius:5px; font-weight:bold;">CARO</div>' : ''}
-                <div class="name"><b>${p.nombre}</b></div>
-                <div class="price">$${p.precio}</div>
-            `;
-            card.onclick = () => this.addToOrder(p);
-            container.appendChild(card);
-        });
+        this._lastClickTime = now;
+        this._lastProdId = prod.id;
+
+        if (prod.requiereCarne) {
+            this.showMeatSelector(prod);
+        } else {
+            this._addItemToOrder(prod);
+        }
     },
+
+    // --- POS (Punto de Venta) ---
 
     renderOrderPanel() {
         const container = document.getElementById('order-side');
@@ -272,7 +309,22 @@ const router = {
         this.refreshOrderList();
     },
 
+    _lastClickTime: 0,
+    _lastProdId: null,
+
     addToOrder(prod) {
+        const now = Date.now();
+        const isDoubleClick = (now - this._lastClickTime < 350) && (this._lastProdId === prod.id);
+        
+        this._lastClickTime = now;
+        this._lastProdId = prod.id;
+
+        if (isDoubleClick) {
+            // Ya se agregó uno por el primer click, agregamos el segundo rápido
+            this._addItemToOrder(prod, this._lastCarneId || null, this._lastIsPremium || false);
+            return;
+        }
+
         if (prod.requiereCarne) {
             this.showMeatSelector(prod);
         } else {
@@ -280,87 +332,9 @@ const router = {
         }
     },
 
-    showMeatSelector(prod) {
-        const m = document.createElement('div');
-        m.className = 'modal-full';
-        m.id = 'meat-modal';
-        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:20000; padding:20px;";
-        
-        this._selectedMeats = [];
-        const isOrder = prod.categoria === 'Ordenes';
-        const maxMeats = isOrder ? 3 : 1;
-
-        const updateMeatModalUI = () => {
-            let carnesHTML = db.carnes.filter(c => c.disponible).map(c => {
-                if (c.exclusivaTaco && prod.categoria !== 'Tacos') return '';
-                const plus = (prod.categoria === 'Ordenes' && c.premium) ? ' (+$30)' : '';
-                const isSel = this._selectedMeats.includes(c.id);
-                
-                return `<button class="btn-primary" style="background:${isSel?'var(--accent)':'white'}; color:${isSel?'white':'black'}; border:2px solid #ddd; padding:15px; font-weight:bold; position:relative;" 
-                        onclick="router.toggleMeatSelection('${c.id}', ${maxMeats}, ${JSON.stringify(prod).replace(/"/g, '&quot;')})">
-                        ${c.nombre}${plus}
-                        ${isSel ? '<span style="position:absolute; top:2px; right:5px; color:white;">✓</span>' : ''}
-                        </button>`;
-            }).join('');
-
-            const soloQueso = prod.categoria === 'Especiales' ? `<button class="btn-primary" style="background:#4CAF50; color:white; padding:15px; font-weight:bold; grid-column: 1/-1;" onclick="router._addItemToOrder(${JSON.stringify(prod).replace(/"/g, '&quot;')}, 'queso')">SOLO QUESO</button>` : '';
-
-            let loncheQueso = '';
-            if (prod.nombre === 'Lonche') {
-                loncheQueso = `<label style="display:block; margin-bottom:15px; color:white; font-size:1.2rem;"><input type="checkbox" id="lonche-q" ${this._loncheQueso?'checked':''} onchange="router._loncheQueso=this.checked" style="transform:scale(1.5); margin-right:10px;"> ¿Con Queso? (+$10)</label>`;
-            }
-
-            m.innerHTML = `
-                <div style="width:100%; max-width:500px; text-align:center;">
-                    <h2 style="color:white; margin-bottom:10px;">${prod.nombre}</h2>
-                    <p style="color:#ccc; margin-bottom:20px;">${isOrder ? 'Selecciona hasta 3 carnes' : 'Selecciona carne'}</p>
-                    ${loncheQueso}
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
-                        ${soloQueso}
-                        ${carnesHTML}
-                    </div>
-                    <div style="display:flex; gap:10px;">
-                        <button class="btn-primary" id="btn-meat-ok" style="flex:2; background:var(--primary); ${this._selectedMeats.length===0?'display:none':''}" onclick="router.confirmMeats(${JSON.stringify(prod).replace(/"/g, '&quot;')})">AGREGAR (${this._selectedMeats.length})</button>
-                        <button class="btn-secondary" style="flex:1; color:white; border-color:white;" onclick="document.getElementById('meat-modal').remove()">CANCELAR</button>
-                    </div>
-                </div>
-            `;
-        };
-
-        this._loncheQueso = false;
-        updateMeatModalUI();
-        this._updateMeatModalUI = updateMeatModalUI;
-        document.body.appendChild(m);
-    },
-
-    toggleMeatSelection(id, max, prod) {
-        const idx = this._selectedMeats.indexOf(id);
-        if (idx > -1) {
-            this._selectedMeats.splice(idx, 1);
-        } else {
-            if (this._selectedMeats.length < max) {
-                this._selectedMeats.push(id);
-            }
-        }
-        
-        if (this._selectedMeats.length === max && max > 1) {
-            this.confirmMeats(prod);
-        } else {
-            this._updateMeatModalUI();
-        }
-    },
-
-    confirmMeats(prod) {
-        const carneStr = this._selectedMeats.join('+');
-        const hasPremium = this._selectedMeats.some(mid => {
-            const c = db.carnes.find(x => x.id === mid);
-            return c && c.premium;
-        });
-        
-        this._addItemToOrder(prod, carneStr, hasPremium);
-    },
-
     _addItemToOrder(prod, carneId = null, isPremium = false) {
+        this._lastCarneId = carneId; // Guardar para doble toque
+        this._lastIsPremium = isPremium;
         const plato = this.ordenActual.platos[this.currentPlatoIdx];
         const conQueso = document.getElementById('lonche-q')?.checked || this._loncheQueso || false;
         
@@ -377,6 +351,7 @@ const router = {
         if (modal) modal.remove();
 
         this.refreshOrderList();
+        this.updateQuickActionsUI(); // Refrescar botones S/Ceb etc.
         app.showNotification(`+ ${prod.nombre} ${carneId ? '('+carneId+')' : ''}`);
     },
 
