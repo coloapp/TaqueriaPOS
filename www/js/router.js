@@ -350,7 +350,7 @@ const router = {
                 <b style="font-size:0.9rem;">${this.orderType.toUpperCase()} ${this.currentMesa ? '#'+this.currentMesa.numero : ''}</b>
                 <div style="display:flex; gap:12px; align-items:center;">
                     <button class="btn-accent" onclick="router.nuevoPlato()" style="padding:4px 10px; font-size:0.7rem; font-weight:bold; border-radius:8px;">+ PLATO</button>
-                    <span onclick="router.toggleMobileOrder()" style="cursor:pointer; font-size:1.8rem; font-weight:bold; padding:0 5px; line-height:1;">&gt;</span>
+                    <span class="close-sidebar-btn" onclick="router.toggleMobileOrder()" style="cursor:pointer; font-size:1.8rem; font-weight:bold; padding:0 5px; line-height:1;">&gt;</span>
                 </div>
             </div>
 
@@ -575,8 +575,9 @@ const router = {
             if (debeImprimir) {
                 await printer.printOrder(comandaNuevos);
             }
+            // Para LLEVAR o DOMICILIO, imprimir también el TICKET DE CUENTA inmediatamente
             if (pedido.tipo !== 'mesa') {
-                await printer.printBill(pedido);
+                setTimeout(() => printer.printBill(pedido), 1000);
             }
         }
 
@@ -850,6 +851,54 @@ const router = {
         };
     },
 
+    async showTicketDetail(id) {
+        let p = db.pedidosActivos.find(x => x.id === id);
+        if (!p) {
+            const res = await db.getPedidosPorEstado('pagado');
+            p = res.find(x => x.id === id);
+        }
+        if (!p) return;
+
+        const m = document.createElement('div');
+        m.className = 'modal-full';
+        m.onclick = (e) => { if(e.target === m) m.remove(); };
+        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:20000; padding:20px;";
+        m.innerHTML = `
+            <div class="modal-content-card" style="background:white; padding:25px; border-radius:20px; width:95%; max-width:420px; max-height:85vh; overflow-y:auto; position:relative; box-shadow: 0 15px 50px rgba(0,0,0,0.5);">
+                <span onclick="this.closest('.modal-full').remove()" style="position:absolute; top:15px; right:20px; cursor:pointer; font-size:2rem; color:#999; line-height:1;">&times;</span>
+                <h3 style="text-align:center; border-bottom:2px solid var(--primary); padding-bottom:10px; margin-bottom:15px; margin-top:0;">TICKET #${p.id.toString().slice(-6)}</h3>
+                <div style="font-size:0.9rem; margin-bottom:15px; color:#555;">
+                    <div>📅 Fecha: ${p.fecha || new Date().toLocaleDateString()}</div>
+                    <div>🏷️ Tipo: <b>${p.tipo.toUpperCase()}</b></div>
+                    ${p.cliente?.nombre ? `<div>👤 Cliente: ${p.cliente.nombre}</div>` : ''}
+                    <div>💰 Pago: ${p.metodo_pago ? p.metodo_pago.toUpperCase() : 'Pendiente'}</div>
+                </div>
+                <div style="border-top:1px dashed #ccc; padding-top:10px;">
+                    ${p.platos.map((pl, i) => `
+                        <div style="margin-bottom:12px; background:#f9f9f9; padding:10px; border-radius:12px;">
+                            <div style="font-weight:bold; font-size:0.75rem; color:var(--primary); margin-bottom:5px;">PLATO ${i+1} ${pl.sinCebolla?'S/CEB':''} ${pl.sinCilantro?'S/CIL':''} ${pl.sinVerdura?'S/VER':''}</div>
+                            ${pl.items.map(it => `
+                                <div style="display:flex; justify-content:space-between; font-size:0.9rem; margin-bottom:3px;">
+                                    <span>${it.cantidad}x ${it.nombre} <small style="color:#777;">(${it.carneId||''})</small></span>
+                                    <b>$${(it.precio * it.cantidad).toFixed(2)}</b>
+                                </div>
+                            `).join('')}
+                            ${pl.notas ? `<div style="font-size:0.75rem; color:#888; font-style:italic; margin-top:5px; border-top:1px solid #eee; padding-top:3px;">Nota: ${pl.notas}</div>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+                <div style="border-top:2px solid #333; margin-top:10px; padding-top:10px; font-size:1.4rem; font-weight:bold; text-align:right; color:var(--primary);">
+                    TOTAL: $${(p.total || db.calcularTotal(p)).toFixed(2)}
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:25px;">
+                    <button class="btn-primary" style="padding:16px; border-radius:15px; font-weight:bold;" onclick="printer.printBill(${JSON.stringify(p).replace(/"/g, '&quot;')})">REIMPRIMIR</button>
+                    <button class="btn-secondary" style="padding:16px; border-radius:15px; border-color:#ddd; font-weight:bold;" onclick="this.closest('.modal-full').remove()">CERRAR</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(m);
+    },
+
     // --- HRM (Personal) ---
     renderHRM() {
         const content = document.getElementById('content');
@@ -1073,35 +1122,38 @@ const router = {
 
         const m = document.createElement('div');
         m.className = 'modal-full';
+        m.onclick = (e) => { if(e.target === m) m.remove(); };
         m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:20000; padding:20px;";
         m.innerHTML = `
-            <div style="background:white; padding:25px; border-radius:15px; width:95%; max-width:400px; max-height:80vh; overflow-y:auto;">
-                <h3 style="text-align:center; border-bottom:2px solid var(--primary); padding-bottom:10px; margin-bottom:15px;">TICKET #${p.id}</h3>
-                <div style="font-size:0.9rem; margin-bottom:15px;">
-                    <div>Fecha: ${p.fecha}</div>
-                    <div>Tipo: ${p.tipo.toUpperCase()}</div>
-                    ${p.cliente?.nombre ? `<div>Cliente: ${p.cliente.nombre}</div>` : ''}
-                    <div>Pago: ${p.metodo_pago ? p.metodo_pago.toUpperCase() : 'N/A'}</div>
+            <div class="modal-content-card" style="background:white; padding:25px; border-radius:20px; width:95%; max-width:420px; max-height:85vh; overflow-y:auto; position:relative; box-shadow: 0 15px 50px rgba(0,0,0,0.5);">
+                <span onclick="this.closest('.modal-full').remove()" style="position:absolute; top:15px; right:20px; cursor:pointer; font-size:2rem; color:#999; line-height:1;">&times;</span>
+                <h3 style="text-align:center; border-bottom:2px solid var(--primary); padding-bottom:10px; margin-bottom:15px; margin-top:0;">TICKET #${p.id.toString().slice(-6)}</h3>
+                <div style="font-size:0.9rem; margin-bottom:15px; color:#555;">
+                    <div>📅 Fecha: ${p.fecha || new Date().toLocaleDateString()}</div>
+                    <div>🏷️ Tipo: <b>${p.tipo.toUpperCase()}</b></div>
+                    ${p.cliente?.nombre ? `<div>👤 Cliente: ${p.cliente.nombre}</div>` : ''}
+                    <div>💰 Pago: ${p.metodo_pago ? p.metodo_pago.toUpperCase() : 'Pendiente'}</div>
                 </div>
                 <div style="border-top:1px dashed #ccc; padding-top:10px;">
                     ${p.platos.map((pl, i) => `
-                        <div style="margin-bottom:10px;">
-                            <div style="font-weight:bold; font-size:0.7rem; color:#666;">PLATO ${i+1} ${pl.sinCebolla?'S/CEB':''} ${pl.sinCilantro?'S/CIL':''} ${pl.sinVerdura?'S/VER':''}</div>
+                        <div style="margin-bottom:12px; background:#f9f9f9; padding:10px; border-radius:12px;">
+                            <div style="font-weight:bold; font-size:0.75rem; color:var(--primary); margin-bottom:5px;">PLATO ${i+1} ${pl.sinCebolla?'S/CEB':''} ${pl.sinCilantro?'S/CIL':''} ${pl.sinVerdura?'S/VER':''}</div>
                             ${pl.items.map(it => `
-                                <div style="display:flex; justify-content:space-between; font-size:0.9rem;">
-                                    <span>${it.cantidad}x ${it.nombre} ${it.carneId?'('+it.carneId+')':''}</span>
-                                    <span>$${(it.precio * it.cantidad).toFixed(2)}</span>
+                                <div style="display:flex; justify-content:space-between; font-size:0.9rem; margin-bottom:3px;">
+                                    <span>${it.cantidad}x ${it.nombre} <small style="color:#777;">(${it.carneId||''})</small></span>
+                                    <b>$${(it.precio * it.cantidad).toFixed(2)}</b>
                                 </div>
                             `).join('')}
+                            ${pl.notas ? `<div style="font-size:0.75rem; color:#888; font-style:italic; margin-top:5px; border-top:1px solid #eee; padding-top:3px;">Nota: ${pl.notas}</div>` : ''}
                         </div>
                     `).join('')}
                 </div>
-                <div style="border-top:2px solid #333; margin-top:10px; padding-top:10px; font-size:1.2rem; font-weight:bold; text-align:right;">
-                    TOTAL: $${p.total.toFixed(2)}
+                <div style="border-top:2px solid #333; margin-top:10px; padding-top:10px; font-size:1.4rem; font-weight:bold; text-align:right; color:var(--primary);">
+                    TOTAL: $${(p.total || db.calcularTotal(p)).toFixed(2)}
                 </div>
-                <div style="display:flex; gap:10px; margin-top:20px;">
-                    <button class="btn-primary" style="flex:1;" onclick="router.printBill(db.pedidosActivos.find(x=>x.id===${p.id}) || ${JSON.stringify(p).replace(/"/g, '&quot;')})">REIMPRIMIR</button>
-                    <button class="btn-secondary" style="flex:1;" onclick="document.querySelector('.modal-full').remove()">CERRAR</button>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:25px;">
+                    <button class="btn-primary" style="padding:16px; border-radius:15px; font-weight:bold;" onclick="printer.printBill(${JSON.stringify(p).replace(/"/g, '&quot;')})">REIMPRIMIR</button>
+                    <button class="btn-secondary" style="padding:16px; border-radius:15px; border-color:#ddd; font-weight:bold;" onclick="this.closest('.modal-full').remove()">CERRAR</button>
                 </div>
             </div>
         `;

@@ -101,6 +101,7 @@ main#content {
     height: 100%;
     width: 100%;
     position: relative;
+    overflow: hidden;
 }
 
 .catalog-side {
@@ -110,19 +111,20 @@ main#content {
     background: #eee;
     min-width: 0;
     height: 100%;
+    transition: margin-right 0.3s ease;
 }
 
 .order-side {
     position: fixed;
-    top: 0; /* Cambio: Desde arriba de todo */
+    top: 0;
     right: 0;
     bottom: 0;
-    width: 380px;
+    width: 350px;
     max-width: 92%;
     background: white;
     display: flex;
     flex-direction: column;
-    z-index: 2500; /* Por encima del header */
+    z-index: 2500;
     box-shadow: -5px 0 25px rgba(0,0,0,0.25);
     transform: translateX(100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -132,62 +134,59 @@ main#content {
     transform: translateX(0);
 }
 
-/* Reducción de tamaños en el footer del pedido */
-.order-footer {
-    padding: 12px 15px;
-    border-top: 1px solid #ddd;
-    background: white;
-    box-shadow: 0 -5px 15px rgba(0,0,0,0.05);
-    flex-shrink: 0;
-}
-
-#order-total {
-    font-size: 1.1rem; /* Más pequeño */
-    font-weight: bold;
-    text-align: right;
-    margin-bottom: 8px;
-    color: var(--primary);
-}
-
-.btn-send-order {
-    padding: 12px; /* Más compacto */
-    font-weight: bold;
-    font-size: 0.9rem;
-    border-radius: 10px;
-}
-
-/* Mobile Toggle Styles */
-#pos-mobile-toggle {
-    display: flex;
-    position: fixed;
-    bottom: 25px;
-    right: 25px;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: white;
-    justify-content: center;
-    align-items: center;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
-    z-index: 1400;
-    font-size: 1.5rem;
-    cursor: pointer;
-    border: 3px solid white;
-}
-
-/* Adaptación para pantallas grandes - Ahora también respeta el full height si el usuario lo activa */
-@media (min-width: 1200px) {
+/* En tablets/desktop separamos las secciones para que no se tapen */
+@media (min-width: 900px) {
     .order-side {
         position: relative;
-        top: 0;
         transform: translateX(0);
         box-shadow: none;
         border-left: 1px solid #ddd;
-        max-width: 350px;
         z-index: 10;
+        flex-shrink: 0;
+    }
+    .catalog-side {
+        /* Se ajusta automáticamente por el flexbox */
     }
     #pos-mobile-toggle { display: none; }
+    
+    /* Mostrar botón de cerrar sidebar solo si es necesario */
+    .order-side .close-sidebar-btn { display: none; }
+}
+
+@media (max-width: 899px) {
+    .order-side .close-sidebar-btn { display: block; }
+}
+
+/* Scroll independiente */
+.products-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+    padding: 10px;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+#platos-lista {
+    flex: 1;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Modales */
+.modal-full {
+    backdrop-filter: blur(3px);
+}
+
+.modal-content-card {
+    background: white;
+    animation: slideInUp 0.3s ease-out;
+}
+
+@keyframes slideInUp {
+    from { transform: translateY(50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
 }
 
 #main-nav { 

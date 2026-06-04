@@ -145,14 +145,13 @@ const printer = {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({
             unit: 'mm',
-            format: [58, 160] // Reducido para mejor visualización en móvil
+            format: [58, 160]
         });
 
         let y = 10;
         const x = 29; 
         const margin = 5;
 
-        // Configuración de fuente para máxima compatibilidad
         doc.setFont("helvetica", "bold");
         doc.setFontSize(11);
         doc.text(db.config.nombreTaqueria.toUpperCase(), x, y, { align: 'center' });
@@ -233,40 +232,39 @@ const printer = {
         doc.setFontSize(8);
         doc.text("¡GRACIAS POR SU PREFERENCIA!", x, y, { align: 'center' });
 
-        // En APK de Android, generamos el PDF y ofrecemos compartirlo
-        const pdfBase64 = doc.output('datauristring').split(',')[1];
-        const fileName = `Ticket_${pedido.id}.pdf`;
+        const pdfDataUri = doc.output('datauristring');
+        const pdfBase64 = pdfDataUri.split(',')[1];
+        const fileName = `Ticket_${pedido.id}_${type}.pdf`;
 
         const m = document.createElement('div');
         m.className = 'modal-full';
-        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:50000; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px;";
+        m.onclick = (e) => { if(e.target === m) m.remove(); };
+        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:50000; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:10px;";
         m.innerHTML = `
-            <div style="background:white; width:100%; max-width:400px; border-radius:20px; overflow:hidden; display:flex; flex-direction:column; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-                <div style="padding:15px; background:var(--primary); color:white; display:flex; justify-content:space-between; align-items:center;">
-                    <b style="font-size:0.9rem;">Ticket Generado ✓</b>
-                    <span onclick="this.parentElement.parentElement.parentElement.remove()" style="cursor:pointer; font-size:1.5rem; padding:5px;">×</span>
+            <div class="modal-content-card" style="background:white; width:100%; max-width:420px; border-radius:25px; overflow:hidden; display:flex; flex-direction:column; box-shadow: 0 15px 50px rgba(0,0,0,0.5);">
+                <div style="padding:15px 20px; background:var(--primary); color:white; display:flex; justify-content:space-between; align-items:center;">
+                    <b style="font-size:1rem;">Vista Previa Ticket</b>
+                    <span onclick="this.closest('.modal-full').remove()" style="cursor:pointer; font-size:2rem; line-height:1;">&times;</span>
                 </div>
                 
-                <div style="padding:30px; text-align:center;">
-                    <div style="font-size:4rem; margin-bottom:15px;">📄</div>
-                    <h3 style="margin-bottom:10px;">${type==='cocina'?'Comanda de Cocina':'Ticket de Venta'}</h3>
-                    <p style="color:#666; font-size:0.9rem; margin-bottom:25px;">El ticket se ha generado correctamente.</p>
-                    
-                    <div style="display:grid; gap:12px;">
-                        <button class="btn-primary" style="background:#25D366; border:none; padding:15px; font-weight:bold; display:flex; align-items:center; justify-content:center; gap:10px;" 
-                                onclick="printer.shareNative('${pdfBase64}', '${fileName}', '${pedido.cliente?.tel || ''}', '${db.calcularTotal(pedido)}')">
-                            <span>📱</span> ENVIAR POR WHATSAPP
-                        </button>
-                        
-                        <button class="btn-secondary" style="padding:15px;" 
-                                onclick="printer.downloadNative('${pdfBase64}', '${fileName}')">
-                            <span>📥</span> GUARDAR EN DISPOSITIVO
-                        </button>
-                    </div>
+                <div style="flex:1; background:#f0f0f0; padding:10px; display:flex; justify-content:center; overflow-y:auto; max-height:60vh;">
+                    <iframe src="${pdfDataUri}#toolbar=0&navpanes=0" style="width:100%; height:450px; border:none; background:white; box-shadow: 0 2px 10px rgba(0,0,0,0.2);"></iframe>
                 </div>
 
-                <div style="padding:15px; background:#f5f5f5; text-align:center;">
-                    <button class="btn-secondary" style="border:none; color:#666; font-size:0.8rem;" onclick="this.parentElement.parentElement.parentElement.remove()">CERRAR VENTANA</button>
+                <div style="padding:20px; display:grid; gap:12px; background:white; border-top:1px solid #eee;">
+                    <button class="btn-primary" style="background:#25D366; border:none; padding:16px; font-weight:bold; display:flex; align-items:center; justify-content:center; gap:10px; border-radius:15px;" 
+                            onclick="printer.shareNative('${pdfBase64}', '${fileName}', '${pedido.cliente?.tel || ''}', '${db.calcularTotal(pedido)}')">
+                        <span style="font-size:1.4rem;">📱</span> ENVIAR POR WHATSAPP
+                    </button>
+                    
+                    <button class="btn-secondary" style="padding:15px; border-radius:15px; font-weight:bold; border-color:#ddd;" 
+                            onclick="printer.downloadNative('${pdfBase64}', '${fileName}')">
+                        <span>📥</span> GUARDAR EN TELÉFONO
+                    </button>
+                </div>
+
+                <div style="padding:12px; background:#f9f9f9; text-align:center; font-size:0.75rem; color:#888;">
+                    Toca fuera para cerrar
                 </div>
             </div>
         `;
@@ -274,33 +272,27 @@ const printer = {
     },
 
     async shareNative(base64, name, tel, total) {
-        // Lógica de compartir nativa de Capacitor
         if (window.Capacitor && window.Capacitor.isNativePlatform()) {
             try {
-                const { Share } = Capacitor.Plugins;
-                const { Filesystem, Directory } = Capacitor.Plugins;
-                
-                // 1. Guardar temporalmente el archivo para compartirlo
+                const { Share, Filesystem, Directory } = Capacitor.Plugins;
+                if (!Filesystem || !Share) throw new Error("Plugins no disponibles");
+
                 const result = await Filesystem.writeFile({
                     path: name,
                     data: base64,
                     directory: Directory.Cache
                 });
 
-                // 2. Abrir hoja de compartir nativa
                 await Share.share({
                     title: 'Ticket Taquería',
-                    text: `Ticket de venta por $${total}`,
-                    url: result.uri,
-                    dialogTitle: 'Enviar ticket via...'
+                    text: `Envío de ticket por $${total}`,
+                    url: result.uri
                 });
             } catch (e) {
                 console.error("Error sharing:", e);
-                // Fallback a link de WhatsApp si falla lo nativo
                 this.shareWhatsApp(tel, total);
             }
         } else {
-            // Fallback para pruebas en navegador
             this.shareWhatsApp(tel, total);
         }
     },
@@ -309,17 +301,30 @@ const printer = {
         if (window.Capacitor && window.Capacitor.isNativePlatform()) {
             try {
                 const { Filesystem, Directory } = Capacitor.Plugins;
+                if (!Filesystem) throw new Error("Plugin Filesystem no disponible");
+
                 await Filesystem.writeFile({
-                    path: name,
+                    path: 'Download/' + name, // Intentar en carpeta Download
                     data: base64,
-                    directory: Directory.Documents
+                    directory: Directory.ExternalStorage || Directory.Documents
                 });
-                app.showNotification("📄 Guardado en Documentos");
+                app.showNotification("✅ Ticket guardado en descargas");
             } catch (e) {
-                app.showNotification("❌ Error al guardar archivo");
+                console.error("Save error:", e);
+                // Segundo intento en Documents si falla ExternalStorage
+                try {
+                    const { Filesystem, Directory } = Capacitor.Plugins;
+                    await Filesystem.writeFile({
+                        path: name,
+                        data: base64,
+                        directory: Directory.Documents
+                    });
+                    app.showNotification("✅ Ticket guardado en Documentos");
+                } catch(e2) {
+                    app.showNotification("❌ Error al guardar: " + e.message);
+                }
             }
         } else {
-            // Navegador: Descarga normal
             const link = document.createElement('a');
             link.href = 'data:application/pdf;base64,' + base64;
             link.download = name;
