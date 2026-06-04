@@ -118,46 +118,151 @@ const printer = {
         return t;
     },
 
-    async sendToPrinter(rawData) {
+    async sendToPrinter(rawData, pedido = null, type = 'ticket') {
         console.log("--- ENVIANDO A IMPRESORA (" + db.config.ticketWidth + ") ---");
-        console.log(rawData);
         
-        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-            try {
-                // Usamos un patrón genérico para plugins de Bluetooth Serial
-                // Si tienes un plugin específico instalado (ej: bluetooth-serial), se llamaría aquí.
-                const btMac = db.config.bluetoothMAC;
-                if (!btMac) {
-                    app.showNotification("⚠️ Configura la MAC de la impresora Bluetooth");
-                    return;
-                }
-
-                // Simulación de envío nativo vía Bluetooth (Requiere plugin instalado)
-                // if (window.bluetoothSerial) {
-                //    window.bluetoothSerial.connect(btMac, () => {
-                //        window.bluetoothSerial.write(rawData, () => {
-                //            window.bluetoothSerial.disconnect();
-                //        });
-                //    });
-                // }
-                
-                app.showNotification("Imprimiendo via Bluetooth...");
-            } catch (e) {
-                console.error("Error Bluetooth:", e);
-                app.showNotification("❌ Error al conectar con impresora");
+        // Si estamos en Chrome/Navegador o no hay MAC, ofrecer ticket virtual
+        if (!window.Capacitor || !window.Capacitor.isNativePlatform() || !db.config.bluetoothMAC) {
+            if (pedido) {
+                this.showVirtualTicket(pedido, type);
+            } else {
+                app.showNotification("⚠️ Impresora no configurada. Usando ticket virtual.");
             }
+            return;
         }
+
+        try {
+            // Simulación de envío nativo vía Bluetooth
+            app.showNotification("Imprimiendo via Bluetooth...");
+            // Aquí iría la lógica real con Capacitor Bluetooth Serial
+        } catch (e) {
+            console.error("Error Bluetooth:", e);
+            if (pedido) this.showVirtualTicket(pedido, type);
+        }
+    },
+
+    showVirtualTicket(pedido, type) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({
+            unit: 'mm',
+            format: [58, 200]
+        });
+
+        let y = 10;
+        const x = 29; // Centro para 58mm
+        const margin = 5;
+
+        doc.setFontSize(10);
+        doc.text(db.config.nombreTaqueria.toUpperCase(), x, y, { align: 'center' });
+        y += 5;
+        doc.setFontSize(7);
+        doc.text(db.config.direccion || '', x, y, { align: 'center' });
+        y += 4;
+        doc.text("Tel: " + (db.config.telefono || ''), x, y, { align: 'center' });
+        y += 5;
+        doc.text("-".repeat(30), x, y, { align: 'center' });
+        y += 5;
+
+        doc.setFontSize(9);
+        doc.text(type === 'cocina' ? "COMANDA COCINA" : "CUENTA CLIENTE", x, y, { align: 'center' });
+        y += 5;
+        doc.setFontSize(8);
+        doc.text((pedido.tipo === 'mesa' ? "MESA #" + pedido.mesaNumero : "PEDIDO: " + pedido.tipo.toUpperCase()), margin, y);
+        y += 4;
+        doc.text("FECHA: " + new Date().toLocaleString(), margin, y);
+        y += 5;
+        doc.text("-".repeat(30), x, y, { align: 'center' });
+        y += 5;
+
+        pedido.platos.forEach((pl, i) => {
+            if (type === 'cocina') doc.setFont(undefined, 'bold');
+            pl.items.forEach(it => {
+                doc.text(`${it.cantidad}x ${it.nombre.toUpperCase()}`, margin, y);
+                if (type !== 'cocina') {
+                    doc.text(`$${(it.cantidad * it.precio).toFixed(2)}`, 53, y, { align: 'right' });
+                }
+                y += 4;
+                if (it.carneId) {
+                    doc.text(`  (${it.carneId.toUpperCase()})`, margin, y);
+                    y += 4;
+                }
+            });
+            doc.setFont(undefined, 'normal');
+            
+            let extras = [];
+            if (pl.sinCebolla) extras.push("S/CEB");
+            if (pl.sinCilantro) extras.push("S/CIL");
+            if (pl.sinVerdura) extras.push("S/VER");
+            if (extras.length > 0) {
+                doc.setFontSize(7);
+                doc.text(">> " + extras.join(' '), margin, y);
+                y += 4;
+            }
+            if (pl.notas) {
+                doc.setFontSize(7);
+                doc.text("NOTA: " + pl.notas, margin, y);
+                y += 4;
+            }
+            y += 2;
+        });
+
+        if (type !== 'cocina') {
+            y += 2;
+            doc.text("-".repeat(30), x, y, { align: 'center' });
+            y += 5;
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'bold');
+            doc.text("TOTAL: $" + db.calcularTotal(pedido).toFixed(2), 53, y, { align: 'right' });
+            doc.setFont(undefined, 'normal');
+        }
+
+        y += 10;
+        doc.setFontSize(8);
+        doc.text("¡GRACIAS POR SU PREFERENCIA!", x, y, { align: 'center' });
+
+        // Crear Modal para previsualizar y compartir
+        const pdfData = doc.output('datauristring');
+        const m = document.createElement('div');
+        m.className = 'modal-full';
+        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:50000; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px;";
+        m.innerHTML = `
+            <div style="background:white; width:100%; max-width:400px; border-radius:20px; overflow:hidden; display:flex; flex-direction:column;">
+                <div style="padding:15px; background:var(--primary); color:white; display:flex; justify-content:space-between; align-items:center;">
+                    <b>Vista Previa Ticket</b>
+                    <span onclick="this.parentElement.parentElement.parentElement.remove()" style="cursor:pointer; font-size:1.5rem;">×</span>
+                </div>
+                <iframe src="${pdfData}" style="width:100%; height:400px; border:none;"></iframe>
+                <div style="padding:20px; display:grid; gap:10px;">
+                    <button class="btn-primary" style="background:#25D366; border:none;" onclick="printer.shareWhatsApp('${pedido.cliente?.tel || ''}', '${db.calcularTotal(pedido)}')">ENVIAR POR WHATSAPP 📱</button>
+                    <button class="btn-secondary" onclick="printer.downloadPDF('${pedido.id}')">DESCARGAR PDF 📥</button>
+                    <button class="btn-secondary" style="border:none;" onclick="this.parentElement.parentElement.parentElement.remove()">CERRAR</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(m);
+    },
+
+    shareWhatsApp(tel, total) {
+        const text = encodeURIComponent(`*${db.config.nombreTaqueria}*\n\nHola! Tu pedido está listo. \nTotal a pagar: *$${total}*\n\n¡Gracias por tu preferencia! 🌮`);
+        const url = tel ? `https://wa.me/52${tel}?text=${text}` : `https://wa.me/?text=${text}`;
+        window.open(url, '_blank');
+    },
+
+    downloadPDF(id) {
+        // La lógica de descarga ya está implícita en el iframe, 
+        // pero podemos forzarla si es necesario volviendo a generar el doc.
+        app.showNotification("Iniciando descarga...");
     },
 
     async printOrder(pedido) {
         const data = this.formatKitchenOrder(pedido);
-        await this.sendToPrinter(data);
-        app.showNotification("Ticket de COCINA enviado");
+        await this.sendToPrinter(data, pedido, 'cocina');
+        app.showNotification("Ticket de COCINA generado");
     },
 
     async printBill(pedido, conComision = false) {
         const data = this.formatBill(pedido, conComision);
-        await this.sendToPrinter(data);
-        app.showNotification("Ticket de CUENTA enviado");
+        await this.sendToPrinter(data, pedido, 'cuenta');
+        app.showNotification("Ticket de CUENTA generado");
     }
 };

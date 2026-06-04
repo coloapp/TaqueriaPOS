@@ -241,6 +241,24 @@ const router = {
         `).join('');
     },
 
+    renderProducts() {
+        const grid = document.getElementById('products-grid');
+        if (!grid) return;
+        
+        const prods = db.productos.filter(p => p.categoria === this.currentCategory);
+        grid.innerHTML = prods.map(p => `
+            <div class="product-card" onclick="router.addToOrder(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                <div style="font-size:0.8rem; font-weight:bold; color:#444;">${p.abreviatura || p.nombre.substring(0,5)}</div>
+                <div style="font-size:0.7rem; color:#888; margin:2px 0;">$${p.precio}</div>
+                <div style="font-size:0.7rem; font-weight:bold; color:var(--primary); line-height:1.1; display:flex; align-items:center; justify-content:center; height:30px;">${p.nombre.toUpperCase()}</div>
+            </div>
+        `).join('');
+        
+        if (prods.length === 0) {
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:#999;">No hay productos en esta categoría.</div>';
+        }
+    },
+
     selectCategory(cat) {
         this.currentCategory = cat;
         this.renderCategories();
@@ -267,16 +285,59 @@ const router = {
 
     addToOrder(prod) {
         const now = Date.now();
-        const isDoubleClick = (now - this._lastClickTime < 300) && (this._lastProdId === prod.id);
+        const isDoubleClick = (now - this._lastClickTime < 350) && (this._lastProdId === prod.id);
         
         this._lastClickTime = now;
         this._lastProdId = prod.id;
+
+        if (isDoubleClick) {
+            this._addItemToOrder(prod, this._lastCarneId || null, this._lastIsPremium || false);
+            return;
+        }
 
         if (prod.requiereCarne) {
             this.showMeatSelector(prod);
         } else {
             this._addItemToOrder(prod);
         }
+    },
+
+    showMeatSelector(prod) {
+        const m = document.createElement('div');
+        m.id = 'meat-modal';
+        m.className = 'modal-full';
+        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:25000; padding:20px;";
+        
+        const isLonche = prod.nombre.toLowerCase().includes('lonche');
+        
+        m.innerHTML = `
+            <div style="background:white; padding:25px; border-radius:20px; width:100%; max-width:400px; text-align:center;">
+                <h2 style="margin-bottom:5px;">${prod.nombre.toUpperCase()}</h2>
+                <p style="color:#666; font-size:0.8rem; margin-bottom:20px;">Selecciona la carne:</p>
+                
+                ${isLonche ? `
+                    <div style="margin-bottom:15px; background:#fff3e0; padding:10px; border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:bold; color:#e65100;">¿CON QUESO? (+ $10)</span>
+                        <input type="checkbox" id="lonche-q" style="width:25px; height:25px;" onchange="router._loncheQueso = this.checked">
+                    </div>
+                ` : ''}
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-height:350px; overflow-y:auto; padding:5px;" class="scrollable-y">
+                    ${db.carnes.filter(c => c.disponible).map(c => `
+                        <button class="btn-secondary" 
+                                style="padding:15px 5px; font-weight:bold; font-size:0.8rem; border-radius:12px; position:relative;" 
+                                onclick="router._addItemToOrder(${JSON.stringify(prod).replace(/"/g, '&quot;')}, '${c.id}', ${c.premium ? 'true' : 'false'})">
+                            ${c.nombre.toUpperCase()}
+                            ${c.premium ? '<span style="position:absolute; top:-5px; right:-5px; background:var(--accent); color:white; font-size:0.5rem; padding:2px 5px; border-radius:5px;">PREMIUM</span>' : ''}
+                        </button>
+                    `).join('')}
+                </div>
+                
+                <button class="btn-secondary" style="width:100%; margin-top:20px; border:none; padding:15px;" onclick="document.getElementById('meat-modal').remove()">CANCELAR</button>
+            </div>
+        `;
+        document.body.appendChild(m);
+        this._loncheQueso = false;
     },
 
     // --- POS (Punto de Venta) ---
