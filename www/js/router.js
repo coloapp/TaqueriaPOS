@@ -140,6 +140,7 @@ const router = {
                         
                         <label style="font-size:0.8rem; font-weight:bold; color:#444;">PIN:</label>
                         <input type="password" id="login-pin-direct" placeholder="••••" maxlength="6"
+                               inputmode="numeric" pattern="[0-9]*"
                                oninput="if(this.value.length>=4) router.handleLoginDirect()"
                                style="width:100%; padding:15px; border:2px solid #eee; border-radius:12px; margin-bottom:20px; font-size:1.5rem; text-align:center; letter-spacing:5px; outline:none;">
                         
