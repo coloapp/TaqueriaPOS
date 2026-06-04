@@ -24,6 +24,14 @@ const router = {
             return;
         }
 
+        // Restricción: Solo admin puede ver Dashboard e Informes
+        const adminViews = ['admin_dashboard', 'admin_informes', 'admin_gastos', 'admin_hrm', 'config'];
+        if (adminViews.includes(view) && this.currentUser.puesto !== 'admin') {
+            app.showNotification("🚫 Acceso restringido solo para Administrador");
+            this.navigate('pos');
+            return;
+        }
+
         switch(view) {
             case 'login': this.renderLogin(); break;
             case 'pos': this.renderPOS(); break;
@@ -598,13 +606,15 @@ const router = {
             <div style="padding:15px; height:100%; display:flex; flex-direction:column;" class="scrollable-y">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                     <h2 style="color:var(--primary); margin:0;">Caja</h2>
-                    <button class="btn-accent" style="padding:8px 15px;" onclick="router.showRetiroModal()">💸 RETIRO SEGURIDAD</button>
+                    ${this.currentUser.puesto === 'admin' ? '<button class="btn-accent" style="padding:8px 15px;" onclick="router.showRetiroModal()">💸 RETIRO SEGURIDAD</button>' : ''}
                 </div>
 
+                ${this.currentUser.puesto === 'admin' ? `
                 <div style="background:#fff9f0; padding:12px; border-radius:10px; margin-bottom:15px; border:1px solid #ffe0b2; display:flex; justify-content:space-between;">
                     <div>En Caja: <b>$${(t.inicioCaja + t.ventas - t.gastos - (t.retiros || 0)).toFixed(2)}</b></div>
                     <div style="color:#e65100;">Retiros: <b>-$${(t.retiros || 0).toFixed(2)}</b></div>
                 </div>
+                ` : ''}
                 
                 <h3 style="font-size:1rem; border-bottom:2px solid var(--primary); padding-bottom:5px;">🏠 EN MESAS</h3>
                 <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:10px; margin-bottom:20px;">
@@ -768,8 +778,10 @@ const router = {
                 <input type="text" id="hr-n" placeholder="Ej: Juan Perez" style="width:100%; padding:12px; margin-bottom:15px; border-radius:10px; border:1px solid #ddd;">
                 <label>Puesto:</label>
                 <select id="hr-p" style="width:100%; padding:12px; margin-bottom:15px; border-radius:10px; border:1px solid #ddd;">
-                    <option value="taquero">Taquero</option>
                     <option value="mesero">Mesero</option>
+                    <option value="cajero">Cajero/a</option>
+                    <option value="taquero">Taquero</option>
+                    <option value="admin">Administrador/Dueño</option>
                     <option value="ocasional">Ocasional / Limpieza</option>
                 </select>
                 <label>Sueldo por Día:</label>
