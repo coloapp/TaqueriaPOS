@@ -90,7 +90,7 @@ const db = {
             CREATE TABLE IF NOT EXISTS gastos (id INTEGER PRIMARY KEY AUTOINCREMENT, monto REAL, descripcion TEXT, categoria TEXT DEFAULT 'Otros', fecha TEXT, hora TEXT, estado TEXT DEFAULT 'pagado'); -- 'pagado' o 'pendiente' (deuda)
             CREATE TABLE IF NOT EXISTS retiros (id INTEGER PRIMARY KEY AUTOINCREMENT, monto REAL, motivo TEXT, fecha TEXT, hora TEXT, turno_id INTEGER);
             CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT);
-            CREATE TABLE IF NOT EXISTS empleados (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL, puesto TEXT, pago_dia REAL DEFAULT 0, activo INTEGER DEFAULT 1);
+            CREATE TABLE IF NOT EXISTS empleados (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL, puesto TEXT, pago_dia REAL DEFAULT 0, activo INTEGER DEFAULT 1, pin TEXT);
             CREATE TABLE IF NOT EXISTS asistencia (id INTEGER PRIMARY KEY AUTOINCREMENT, empleado_id INTEGER, fecha TEXT NOT NULL, hora_entrada TEXT, pago_acordado REAL, estado TEXT DEFAULT 'presente');
             CREATE TABLE IF NOT EXISTS adelantos (id INTEGER PRIMARY KEY AUTOINCREMENT, empleado_id INTEGER, monto REAL NOT NULL, fecha TEXT NOT NULL, hora TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS logs_agotados (id INTEGER PRIMARY KEY AUTOINCREMENT, carne TEXT, fecha TEXT, hora TEXT);
@@ -432,7 +432,8 @@ const db = {
         return res.values || [];
     },
 
-    async addEmpleado(n, p, pd) { const res = await this.run("INSERT INTO empleados (nombre, puesto, pago_dia) VALUES (?, ?, ?)", [n, p, pd]); const e = { id: res.changes.lastId, nombre: n, puesto: p, pago_dia: pd, activo: 1 }; this.empleados.push(e); return e; },
+    async addEmpleado(n, p, pd, pin) { const res = await this.run("INSERT INTO empleados (nombre, puesto, pago_dia, pin) VALUES (?, ?, ?, ?)", [n, p, pd, pin]); const e = { id: res.changes.lastId, nombre: n, puesto: p, pago_dia: pd, pin, activo: 1 }; this.empleados.push(e); return e; },
+    verificarLoginEmpleado(n, p) { return this.empleados.find(e => e.nombre === n && e.pin === p); },
     async registrarAsistencia(id, pd) { const hoy = new Date().toLocaleDateString(); const h = new Date().toLocaleTimeString(); const check = await this.query("SELECT id FROM asistencia WHERE empleado_id = ? AND fecha = ?", [id, hoy]); if (check.values.length > 0) return false; await this.run("INSERT INTO asistencia (empleado_id, fecha, hora_entrada, pago_acordado) VALUES (?, ?, ?, ?)", [id, hoy, h, pd]); if (this.turnoActual) await this.addGasto({ monto: pd, descripcion: `Sueldo: ${id}` }); return true; },
     async addAdelanto(id, m) { const hoy = new Date().toLocaleDateString(); const h = new Date().toLocaleTimeString(); await this.run("INSERT INTO adelantos (empleado_id, monto, fecha, hora) VALUES (?, ?, ?, ?)", [id, m, hoy, h]); await this.addGasto({ monto: m, descripcion: `Adelanto: ${id}` }); },
 

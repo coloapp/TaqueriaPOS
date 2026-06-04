@@ -10,13 +10,22 @@ const router = {
     ordenActual: { platos: [{ items: [], sinCebolla: false, sinCilantro: false, notas: '' }] },
     currentPlatoIdx: 0,
 
+    currentUser: null,
+
     navigate(view) {
         this.closeSidebar();
         const content = document.getElementById('content');
         content.innerHTML = '';
         content.dataset.view = view;
         
+        // Si no hay usuario logueado y no es la pantalla de login, forzar login
+        if (!this.currentUser && view !== 'login') {
+            this.renderLogin();
+            return;
+        }
+
         switch(view) {
+            case 'login': this.renderLogin(); break;
             case 'pos': this.renderPOS(); break;
             case 'mesas': this.renderMesas(); break;
             case 'caja': this.renderCaja(); break;
@@ -95,6 +104,83 @@ const router = {
             }
         }
         if (input) input.value = this._pinBuffer.replace(/./g, '*');
+    },
+
+    // --- LOGIN ---
+    renderLogin() {
+        const content = document.getElementById('content');
+        const users = db.empleados.filter(e => e.activo);
+        
+        content.innerHTML = `
+            <div class="login-container">
+                <div class="login-card">
+                    <div class="user-avatar" id="login-avatar">👤</div>
+                    <h2 id="login-title">Inicia Sesión</h2>
+                    <p id="login-subtitle">Selecciona tu usuario</p>
+                    
+                    <div class="user-selector" id="user-selector">
+                        ${users.map(u => `
+                            <div class="user-item" onclick="router.selectUserLogin(${u.id}, '${u.nombre}', '${u.puesto}')">
+                                <span class="icon">${u.puesto === 'mesero' ? '伺' : (u.puesto === 'taquero' ? '🌮' : '👤')}</span>
+                                <span class="name">${u.nombre}</span>
+                            </div>
+                        `).join('')}
+                        ${users.length === 0 ? '<div style="grid-column:1/-1; padding:20px; color:#999;">No hay empleados registrados. Usa el PIN de Admin.</div>' : ''}
+                    </div>
+
+                    <div id="pin-section" style="display:none;">
+                        <input type="password" id="login-pin" placeholder="PIN" readonly 
+                               style="width:100%; padding:15px; font-size:1.5rem; text-align:center; border:2px solid #ddd; border-radius:15px; margin-bottom:20px; letter-spacing:10px;">
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+                            ${[1,2,3,4,5,6,7,8,9,'C',0].map(n => `
+                                <button class="btn-secondary" style="padding:15px; font-size:1.2rem; font-weight:bold; border-radius:12px;" onclick="router._handleLoginKey('${n}')">${n}</button>
+                            `).join('')}
+                            <button class="btn-secondary" style="padding:15px; font-size:0.8rem; font-weight:bold; border-radius:12px; color:red;" onclick="router.resetLogin()">VOLVER</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    _selectedUserId: null,
+    _loginPinBuffer: '',
+
+    selectUserLogin(id, nombre, puesto) {
+        this._selectedUserId = id;
+        this._loginPinBuffer = '';
+        document.getElementById('user-selector').style.display = 'none';
+        document.getElementById('pin-section').style.display = 'block';
+        document.getElementById('login-title').innerText = nombre;
+        document.getElementById('login-subtitle').innerText = puesto.toUpperCase();
+        document.getElementById('login-avatar').innerText = puesto === 'mesero' ? '伺' : (puesto === 'taquero' ? '🌮' : '👤');
+    },
+
+    resetLogin() {
+        this._selectedUserId = null;
+        this._loginPinBuffer = '';
+        this.renderLogin();
+    },
+
+    _handleLoginKey(key) {
+        const input = document.getElementById('login-pin');
+        if (key === 'C') {
+            this._loginPinBuffer = '';
+        } else {
+            if (this._loginPinBuffer.length < 4) this._loginPinBuffer += key;
+            if (this._loginPinBuffer.length === 4) {
+                const user = db.empleados.find(e => e.id === this._selectedUserId);
+                if (user && user.pin === this._loginPinBuffer) {
+                    this.currentUser = user;
+                    app.showNotification(`Bienvenido, ${user.nombre}`);
+                    this.navigate('pos');
+                } else {
+                    app.showNotification("❌ PIN INCORRECTO");
+                    this._loginPinBuffer = '';
+                }
+            }
+        }
+        if (input) input.value = this._loginPinBuffer.replace(/./g, '*');
     },
 
     // --- POS (Punto de Venta) ---
@@ -309,8 +395,16 @@ const router = {
     },
 
     eliminarItem(idxItem) {
-        this.ordenActual.platos[this.currentPlatoIdx].items.splice(idxItem, 1);
-        this.refreshOrderList();
+        const action = () => {
+            this.ordenActual.platos[this.currentPlatoIdx].items.splice(idxItem, 1);
+            this.refreshOrderList();
+        };
+
+        if (this.ordenActual.id) {
+            this.askForPin('admin', action);
+        } else {
+            action();
+        }
     },
 
     refreshOrderList() {
@@ -360,17 +454,25 @@ const router = {
     },
 
     eliminarPlatoEspecifico(idx) {
-        if (this.ordenActual.platos.length > 1) {
-            this.ordenActual.platos.splice(idx, 1);
-            this.currentPlatoIdx = Math.max(0, this.currentPlatoIdx - 1);
-            this.renderOrderPanel();
+        const action = () => {
+            if (this.ordenActual.platos.length > 1) {
+                this.ordenActual.platos.splice(idx, 1);
+                this.currentPlatoIdx = Math.max(0, this.currentPlatoIdx - 1);
+                this.renderOrderPanel();
+            } else {
+                this.ordenActual.platos[0].items = [];
+                this.ordenActual.platos[0].sinCebolla = false;
+                this.ordenActual.platos[0].sinCilantro = false;
+                this.ordenActual.platos[0].sinVerdura = false;
+                this.ordenActual.platos[0].notas = '';
+                this.refreshOrderList();
+            }
+        };
+
+        if (this.ordenActual.id) {
+            this.askForPin('admin', action);
         } else {
-            this.ordenActual.platos[0].items = [];
-            this.ordenActual.platos[0].sinCebolla = false;
-            this.ordenActual.platos[0].sinCilantro = false;
-            this.ordenActual.platos[0].sinVerdura = false;
-            this.ordenActual.platos[0].notas = '';
-            this.refreshOrderList();
+            action();
         }
     },
 
@@ -692,6 +794,8 @@ const router = {
                 </select>
                 <label>Sueldo por Día:</label>
                 <input type="number" id="hr-s" placeholder="$0.00" style="width:100%; padding:12px; margin-bottom:15px; border-radius:10px; border:1px solid #ddd;">
+                <label>PIN Acceso (4 dígitos):</label>
+                <input type="password" id="hr-pin" placeholder="0000" maxlength="4" style="width:100%; padding:12px; margin-bottom:15px; border-radius:10px; border:1px solid #ddd;">
                 <div style="display:flex; gap:10px; margin-top:20px;">
                     <button class="btn-primary" style="flex:1;" onclick="router.handleSaveHRM()">GUARDAR</button>
                     <button class="btn-secondary" style="flex:1;" onclick="document.querySelector('.modal-full').remove()">CANCELAR</button>
@@ -705,7 +809,9 @@ const router = {
         const n = document.getElementById('hr-n').value;
         const p = document.getElementById('hr-p').value;
         const s = parseFloat(document.getElementById('hr-s').value);
-        if(n && s) { await db.addEmpleado(n, p, s); document.querySelector('.modal-full').remove(); this.renderHRM(); }
+        const pin = document.getElementById('hr-pin').value;
+        if(n && s && pin) { await db.addEmpleado(n, p, s, pin); document.querySelector('.modal-full').remove(); this.renderHRM(); }
+        else { alert("Todos los campos son obligatorios, incluyendo el PIN."); }
     },
 
     async handleAsistencia(id, sueldo) { if(confirm("¿Registrar asistencia y pagar sueldo hoy?")) { const ok = await db.registrarAsistencia(id, sueldo); if(ok) app.showNotification("Asistencia registrada ✓"); else app.showNotification("Ya se registró hoy"); } },
@@ -1197,121 +1303,5 @@ const router = {
         await db.save(); 
         app.showNotification("Configuración Guardada");
         this.navigate('pos'); 
-    },
-
-    _handlePinKey(key, level) {
-        const input = document.getElementById('pin-input');
-        if (key === 'C') {
-            this._pinBuffer = '';
-        } else {
-            if (this._pinBuffer.length < 4) this._pinBuffer += key;
-            
-            if (this._pinBuffer.length === 4) {
-                if (db.verificarPin(this._pinBuffer, level)) {
-                    setTimeout(() => {
-                        const modal = document.getElementById('pin-modal');
-                        if (modal) modal.remove();
-                        if (this._pinCallback) this._pinCallback();
-                        this._pinCallback = null;
-                    }, 200);
-                } else {
-                    app.showNotification("❌ PIN INCORRECTO");
-                    this._pinBuffer = '';
-                }
-            }
-        }
-        if (input) input.value = this._pinBuffer.replace(/./g, '*');
-    },
-
-    showMeatSelector(prod) {
-        const m = document.createElement('div');
-        m.className = 'modal-full';
-        m.id = 'meat-modal';
-        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:20000; padding:20px;";
-        
-        this._selectedMeats = [];
-        const isOrder = prod.categoria === 'Ordenes';
-        const maxMeats = isOrder ? 3 : 1;
-
-        const updateMeatModalUI = () => {
-            let carnesHTML = db.carnes.filter(c => c.disponible).map(c => {
-                if (c.exclusivaTaco && prod.categoria !== 'Tacos') return '';
-                const plus = (prod.categoria === 'Ordenes' && c.premium) ? ' (+$30)' : '';
-                const isSel = this._selectedMeats.includes(c.id);
-                
-                return `<button class="btn-primary" style="background:${isSel?'var(--accent)':'white'}; color:${isSel?'white':'black'}; border:2px solid #ddd; padding:15px; font-weight:bold; position:relative;" 
-                        onclick="router.toggleMeatSelection('${c.id}', ${maxMeats}, ${JSON.stringify(prod).replace(/"/g, '&quot;')})">
-                        ${c.nombre}${plus}
-                        ${isSel ? '<span style="position:absolute; top:2px; right:5px; color:white;">✓</span>' : ''}
-                        </button>`;
-            }).join('');
-
-            const soloQueso = prod.categoria === 'Especiales' ? `<button class="btn-primary" style="background:#4CAF50; color:white; padding:15px; font-weight:bold; grid-column: 1/-1;" onclick="router._addItemToOrder(${JSON.stringify(prod).replace(/"/g, '&quot;')}, 'queso')">SOLO QUESO</button>` : '';
-
-            let loncheQueso = '';
-            if (prod.nombre === 'Lonche') {
-                loncheQueso = `<label style="display:block; margin-bottom:15px; color:white; font-size:1.2rem;"><input type="checkbox" id="lonche-q" ${this._loncheQueso?'checked':''} onchange="router._loncheQueso=this.checked" style="transform:scale(1.5); margin-right:10px;"> ¿Con Queso? (+$10)</label>`;
-            }
-
-            m.innerHTML = `
-                <div style="width:100%; max-width:500px; text-align:center;">
-                    <h2 style="color:white; margin-bottom:10px;">${prod.nombre}</h2>
-                    <p style="color:#ccc; margin-bottom:20px;">${isOrder ? 'Selecciona hasta 3 carnes' : 'Selecciona carne'}</p>
-                    ${loncheQueso}
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
-                        ${soloQueso}
-                        ${carnesHTML}
-                    </div>
-                    <div style="display:flex; gap:10px;">
-                        <button class="btn-primary" id="btn-meat-ok" style="flex:2; background:var(--primary); ${this._selectedMeats.length===0?'display:none':''}" onclick="router.confirmMeats(${JSON.stringify(prod).replace(/"/g, '&quot;')})">AGREGAR (${this._selectedMeats.length})</button>
-                        <button class="btn-secondary" style="flex:1; color:white; border-color:white;" onclick="document.getElementById('meat-modal').remove()">CANCELAR</button>
-                    </div>
-                </div>
-            `;
-        };
-
-        this._loncheQueso = false;
-        updateMeatModalUI();
-        this._updateMeatModalUI = updateMeatModalUI;
-        document.body.appendChild(m);
-    },
-
-    toggleMeatSelection(id, max, prod) {
-        const idx = this._selectedMeats.indexOf(id);
-        if (idx > -1) {
-            this._selectedMeats.splice(idx, 1);
-        } else {
-            if (this._selectedMeats.length < max) {
-                this._selectedMeats.push(id);
-            }
-        }
-        
-        if (this._selectedMeats.length === max && max > 1) {
-            this.confirmMeats(prod);
-        } else {
-            this._updateMeatModalUI();
-        }
-    },
-
-    confirmMeats(prod) {
-        const carneStr = this._selectedMeats.join('+');
-        const hasPremium = this._selectedMeats.some(mid => {
-            const c = db.carnes.find(x => x.id === mid);
-            return c && c.premium;
-        });
-        
-        this._addItemToOrder(prod, carneStr, hasPremium);
-    },
-
-    _addItemToOrder(prod, carneId = null, isPremium = false) {
-        const plato = this.ordenActual.platos[this.currentPlatoIdx];
-        const conQueso = document.getElementById('lonche-q')?.checked || this._loncheQueso || false;
-        const item = { ...prod, id: prod.id, cantidad: 1, notas: '', carneId, conQueso, isPremiumMeat: isPremium };
-        const existing = plato.items.find(i => i.id === prod.id && i.carneId === carneId && i.conQueso === conQueso);
-        if (existing) { existing.cantidad++; } else { plato.items.push(item); }
-        const modal = document.getElementById('meat-modal');
-        if (modal) modal.remove();
-        this.refreshOrderList();
-        app.showNotification(`+ ${prod.nombre} ${carneId ? '('+carneId+')' : ''}`);
     }
 };

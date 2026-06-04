@@ -105,11 +105,11 @@ const app = {
                 <button id="btn-caja-nav" onclick="router.navigate('caja')">Caja</button>
                 <button id="btn-monitor-nav" onclick="router.navigate('cocina')">Monitor</button>
             `;
-            router.navigate('pos');
         } else {
             mainNav.innerHTML = `<button id="btn-mesas-nav" onclick="router.navigate('mesas')">Mesas</button>`;
-            router.navigate('mesas');
         }
+        
+        router.navigate('login');
 
         // El menú lateral ahora es visible para ambos roles por petición del usuario
         sidebarMenu.innerHTML = `
