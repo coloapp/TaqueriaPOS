@@ -35,8 +35,13 @@ const app = {
                 <p style="color:#666; font-size:0.9rem; margin-bottom:25px;">Configura tu negocio para empezar.</p>
                 
                 <div style="text-align:left; margin-bottom:20px;">
+                    <label style="font-size:0.75rem; font-weight:bold;">DATOS DEL LOCAL:</label>
                     <input type="text" id="cfg-tel" value="${db.config.telefono}" placeholder="Teléfono del Local" style="width:100%; padding:12px; margin-bottom:10px; border:1px solid #ddd; border-radius:8px;">
-                    <input type="text" id="cfg-dir" value="${db.config.direccion}" placeholder="Dirección del Local" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px;">
+                    <input type="text" id="cfg-dir" value="${db.config.direccion}" placeholder="Dirección del Local" style="width:100%; padding:12px; margin-bottom:20px; border:1px solid #ddd; border-radius:8px;">
+                    
+                    <label style="font-size:0.75rem; font-weight:bold;">USUARIO DUEÑO/ADMIN:</label>
+                    <input type="text" id="cfg-admin-user" placeholder="Nombre de usuario admin" style="width:100%; padding:12px; margin-bottom:10px; border:1px solid var(--primary); border-radius:8px;">
+                    <input type="password" id="cfg-admin-pin" placeholder="PIN de 4 dígitos" maxlength="4" style="width:100%; padding:12px; margin-bottom:20px; border:1px solid var(--primary); border-radius:8px;">
                 </div>
 
                 <div style="background:#f5f5f5; padding:15px; border-radius:10px; margin-bottom:20px; border:1px dashed #bbb;">
@@ -45,7 +50,7 @@ const app = {
                     <input type="text" id="activation-code" placeholder="CÓDIGO DE ACTIVACIÓN" style="width:100%; padding:15px; border:1px solid var(--primary); border-radius:8px; text-align:center; font-weight:bold; letter-spacing:1px;">
                 </div>
 
-                <button class="btn-primary" style="width:100%; padding:18px; font-size:1.1rem;" onclick="app.activarLicencia()">ACTIVAR AHORA</button>
+                <button class="btn-primary" style="width:100%; padding:18px; font-size:1.1rem;" onclick="app.activarLicencia()">ACTIVAR Y CREAR ADMIN</button>
             </div>
         `;
         document.body.appendChild(div);
@@ -55,13 +60,24 @@ const app = {
         const tel = document.getElementById('cfg-tel').value;
         const dir = document.getElementById('cfg-dir').value;
         const code = document.getElementById('activation-code').value;
+        const adminUser = document.getElementById('cfg-admin-user').value.trim();
+        const adminPin = document.getElementById('cfg-admin-pin').value;
+
+        if (!adminUser || !adminPin || adminPin.length < 4) {
+            alert("Define un usuario y PIN de administrador (4 dígitos)");
+            return;
+        }
 
         if (await db.verificarActivacion(code)) {
             db.config.telefono = tel;
             db.config.direccion = dir;
+            db.config.pin = adminPin; // Actualizar PIN maestro
             await db.save();
             
-            app.showNotification("¡ACTIVADO!");
+            // Crear el primer empleado administrador
+            await db.addEmpleado(adminUser, 'admin', 0, adminPin);
+            
+            app.showNotification("¡SISTEMA ACTIVADO Y ADMIN CREADO!");
             const screen = document.getElementById('activation-screen');
             if(screen) screen.remove();
             this.startUI('caja');

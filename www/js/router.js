@@ -169,6 +169,14 @@ const router = {
             return;
         }
 
+        // Acceso Maestro para el Dueño (si no hay usuarios o para mantenimiento)
+        if (userStr.toLowerCase() === 'admin' && pinStr === db.config.pin) {
+            this.currentUser = { id: 0, nombre: 'Dueño Maestro', puesto: 'admin', activo: 1 };
+            app.showNotification("Bienvenido, Administrador");
+            this.navigate('pos');
+            return;
+        }
+
         const user = db.empleados.find(e => e.nombre.toLowerCase() === userStr.toLowerCase() && e.pin === pinStr);
         
         if (user) {
@@ -1139,11 +1147,9 @@ const router = {
             </div>
         ` + db.categorias.map(c => `
             <div class="sidebar-item ${this._selectedAdminCat === c ? 'active' : ''}" onclick="router._selectedAdminCat='${c}'; router.refreshAdminCatalog()">
-                <span>🏷️</span>
-                <span style="flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c}</span>
-                <div style="display:flex; gap:12px; margin-left: auto;">
-                    <span onclick="event.stopPropagation(); router.showCategoryModal('${c}')" style="color:var(--accent); padding: 5px;">✎</span>
-                    <span onclick="event.stopPropagation(); router.handleDeleteCategory('${c}')" style="color:red; padding: 5px;">×</span>
+                <span style="flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:0.9rem;">${c}</span>
+                <div style="display:flex; gap:5px; margin-left: 10px;">
+                    <span onclick="event.stopPropagation(); router.showCategoryModal('${c}')" style="color:var(--accent); padding: 5px; font-size:1.1rem;">⋮</span>
                 </div>
             </div>
         `).join('');
@@ -1153,13 +1159,30 @@ const router = {
         document.getElementById('current-cat-name').innerText = this._selectedAdminCat || 'Todos los Productos';
         
         prodList.innerHTML = prods.map(p => `
-            <div class="product-card" style="height:auto; aspect-ratio:auto; padding:15px; border:1px solid #ddd; background:#fff; border-radius:12px; text-align:center;" onclick="router.showProductCard(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-                <div style="font-size:1.8rem; margin-bottom:8px;">${p.categoria === 'Bebidas' ? '🥤' : (p.categoria === 'Especiales' ? '✨' : '🌮')}</div>
-                <b style="font-size:0.9rem; display:block; margin-bottom:5px;">${p.nombre}</b>
-                <span style="color:var(--primary); font-weight:bold; font-size:1rem;">$${p.precio}</span>
-                <div style="font-size:0.7rem; color:#888; margin-top:5px;">${p.requiereCarne ? '🥩 Especial' : ''}</div>
+            <div class="admin-card" style="padding:15px; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-left:4px solid var(--primary);">
+                <div style="flex:1;">
+                    <b style="font-size:1rem; display:block; color:#333;">${p.nombre}</b>
+                    <span style="color:var(--primary); font-weight:bold; font-size:1.1rem;">$${p.precio}</span>
+                    ${p.requiereCarne ? '<span style="font-size:0.6rem; background:#eee; padding:2px 5px; border-radius:4px; margin-left:8px; color:#666;">REQUIERE CARNE</span>' : ''}
+                </div>
+                <div style="font-size:1.5rem; color:#999; padding:10px; cursor:pointer;" onclick="router.showProductActions(${JSON.stringify(p).replace(/"/g, '&quot;')})">⋮</div>
             </div>
         `).join('');
+    },
+
+    showProductActions(p) {
+        const m = document.createElement('div');
+        m.className = 'modal-full';
+        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:flex-end; z-index:25000;";
+        m.innerHTML = `
+            <div style="background:white; width:100%; border-top-left-radius:25px; border-top-right-radius:25px; padding:20px; animation: slideUp 0.3s ease-out;">
+                <h3 style="margin-top:0; text-align:center; color:#666;">${p.nombre}</h3>
+                <button class="btn-primary" style="width:100%; margin-bottom:12px; padding:15px; border-radius:15px; background:var(--accent);" onclick="document.querySelector('.modal-full').remove(); router.showProductCard(${JSON.stringify(p).replace(/"/g, '&quot;')})">✏️ EDITAR PRODUCTO</button>
+                <button class="btn-secondary" style="width:100%; margin-bottom:20px; padding:15px; border-radius:15px; color:red; border-color:#ffcdd2;" onclick="router.handleDeleteProduct(${p.id})">🗑️ ELIMINAR PRODUCTO</button>
+                <button class="btn-secondary" style="width:100%; border:none; padding:15px;" onclick="document.querySelector('.modal-full').remove()">CANCELAR</button>
+            </div>
+        `;
+        document.body.appendChild(m);
     },
 
     showCategoryModal(oldName = null) {

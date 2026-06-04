@@ -130,24 +130,48 @@ const db = {
             const catRes = await this.query("SELECT * FROM categorias");
             this.categorias = catRes.values.map(c => c.nombre);
 
-            const prodRes = await this.query("SELECT p.*, c.nombre as categoria FROM productos p JOIN categorias c ON p.categoria_id = c.id");
-            this.productos = prodRes.values.map(p => ({ ...p, requiereCarne: !!p.requiereCarne }));
+            // Obtener productos con nombre de categoría para el filtrado en POS
+            const prodRes = await this.query("SELECT p.*, c.nombre as categoria FROM productos p LEFT JOIN categorias c ON p.categoria_id = c.id");
+            this.productos = (prodRes.values || []).map(p => ({ ...p, requiereCarne: !!p.requiereCarne }));
 
-            const carRes = await this.query("SELECT * FROM carnes");
-            this.carnes = carRes.values.map(c => ({ ...c, disponible: !!c.disponible }));
+            const carneRes = await this.query("SELECT * FROM carnes");
+            this.carnes = (carneRes.values || []).map(c => ({ ...c, disponible: !!c.disponible }));
 
             const mesaRes = await this.query("SELECT * FROM mesas");
-            this.mesas = mesaRes.values;
+            this.mesas = mesaRes.values || [];
 
-            const turRes = await this.query("SELECT * FROM turnos ORDER BY id DESC");
-            this.turnos = turRes.values;
-            this.turnoActual = this.turnos.find(t => t.estado === 'abierto') || null;
+            const tRes = await this.query("SELECT * FROM turnos WHERE estado = 'abierto' LIMIT 1");
+            this.turnoActual = tRes.values.length > 0 ? tRes.values[0] : null;
+
+            const pedRes = await this.query("SELECT * FROM pedidos WHERE estado != 'pagado' AND estado != 'cancelado'");
+            this.pedidosActivos = [];
+            for (const p of pedRes.values) {
+                const detRes = await this.query("SELECT * FROM pedido_detalles WHERE pedido_id = ?", [p.id]);
+                const platos = [];
+                for (const d of detRes.values) {
+                    const prod = this.productos.find(x => x.id === d.producto_id);
+                    if (!platos[d.plato_index]) platos[d.plato_index] = { items: [], sinCebolla: !!d.sin_cebolla, sinCilantro: !!d.sin_cilantro, sinVerdura: !!d.sin_verdura, notas: d.notas };
+                    if (prod) platos[d.plato_index].items.push({ ...prod, cantidad: d.cantidad, precio: d.precio_unitario, notas: d.notas });
+                }
+                this.pedidosActivos.push({ ...p, platos, cliente: { nombre: p.cliente_nombre, tel: p.cliente_telefono } });
+            }
 
             const gasRes = await this.query("SELECT * FROM gastos ORDER BY id DESC");
-            this.gastos = gasRes.values;
+            this.gastos = gasRes.values || [];
 
             const empRes = await this.query("SELECT * FROM empleados");
-            this.empleados = empRes.values;
+            this.empleados = empRes.values || [];
+
+            const confRes = await this.query("SELECT * FROM config");
+            confRes.values.forEach(c => {
+                if (c.key === 'imprimirExtras') this.config[c.key] = (c.value === 'true');
+                else if (!isNaN(c.value) && c.value !== '') this.config[c.key] = parseFloat(c.value);
+                else this.config[c.key] = c.value;
+            });
+        } catch (e) {
+            console.error("Error en loadFromDb:", e);
+        }
+    },
 
             const confRes = await this.query("SELECT * FROM config");
             confRes.values.forEach(row => { try { this.config[row.key] = JSON.parse(row.value); } catch (e) { this.config[row.key] = row.value; } });
