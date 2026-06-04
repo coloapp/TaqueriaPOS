@@ -1367,11 +1367,29 @@ const router = {
                         </div>
                     </div>
                     
-                    <button class="btn-primary" style="margin-top:20px;" onclick="router.guardarConfig()">GUARDAR</button>
+                    <button class="btn-secondary" style="margin-top:20px; color:var(--accent); border-color:var(--accent);" onclick="router.handleRepairDB()">🛠️ REPARAR BASE DE DATOS</button>
+                    <button class="btn-primary" style="margin-top:10px;" onclick="router.guardarConfig()">GUARDAR</button>
                 </div>
             </div>
         `;
     },
+    async handleRepairDB() {
+        if (confirm("¿Intentar reparar la conexión a la base de datos? No se borrarán tus datos, solo se reiniciará el plugin de Capacitor.")) {
+            try {
+                app.showNotification("⏳ Reparando conexión...");
+                const ok = await db.repairConnection();
+                if (ok) {
+                    app.showNotification("✅ Base de datos restaurada");
+                    this.navigate('pos');
+                } else {
+                    app.showNotification("❌ No se pudo restaurar");
+                }
+            } catch (e) {
+                app.showNotification("❌ Error: " + e.message);
+            }
+        }
+    },
+
     async guardarConfig() { 
         db.config.nombreTaqueria = document.getElementById('cf-n').value; 
         db.config.telefono = document.getElementById('cf-t').value; 

@@ -240,5 +240,33 @@ const db = {
             this.turnoActual.retiros += monto;
             await this.addLog('RETIRO', `Monto: ${monto}, Motivo: ${desc}`);
         }
+    },
+
+    async repairConnection() {
+        console.log("DB: Intentando reparación de conexión...");
+        try {
+            if (this.dbConn) {
+                try {
+                    await this.dbConn.close();
+                } catch (e) {
+                    console.log("Error cerrando conexión previa (esperado):", e);
+                }
+                this.dbConn = null;
+            }
+            
+            // Re-inicializar
+            await this.init();
+            
+            // Verificar integridad básica
+            if (this.dbConn) {
+                await this.dbConn.execute("PRAGMA integrity_check;");
+                await this.addLog('SISTEMA', 'Conexión a BD reparada manualmente');
+                return true;
+            }
+            return false;
+        } catch (e) {
+            console.error("Error en reparación de BD:", e);
+            throw e;
+        }
     }
 };
