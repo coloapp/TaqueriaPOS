@@ -145,49 +145,62 @@ const printer = {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({
             unit: 'mm',
-            format: [58, 200]
+            format: [58, 160] // Reducido para mejor visualización en móvil
         });
 
         let y = 10;
-        const x = 29; // Centro para 58mm
+        const x = 29; 
         const margin = 5;
 
-        doc.setFontSize(10);
+        // Configuración de fuente para máxima compatibilidad
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
         doc.text(db.config.nombreTaqueria.toUpperCase(), x, y, { align: 'center' });
+        
+        doc.setFont("helvetica", "normal");
         y += 5;
         doc.setFontSize(7);
         doc.text(db.config.direccion || '', x, y, { align: 'center' });
         y += 4;
         doc.text("Tel: " + (db.config.telefono || ''), x, y, { align: 'center' });
         y += 5;
-        doc.text("-".repeat(30), x, y, { align: 'center' });
+        doc.setLineWidth(0.1);
+        doc.line(margin, y, 53, y);
         y += 5;
 
         doc.setFontSize(9);
+        doc.setFont(undefined, 'bold');
         doc.text(type === 'cocina' ? "COMANDA COCINA" : "CUENTA CLIENTE", x, y, { align: 'center' });
         y += 5;
         doc.setFontSize(8);
+        doc.setFont(undefined, 'normal');
         doc.text((pedido.tipo === 'mesa' ? "MESA #" + pedido.mesaNumero : "PEDIDO: " + pedido.tipo.toUpperCase()), margin, y);
         y += 4;
         doc.text("FECHA: " + new Date().toLocaleString(), margin, y);
         y += 5;
-        doc.text("-".repeat(30), x, y, { align: 'center' });
+        doc.line(margin, y, 53, y);
         y += 5;
 
         pedido.platos.forEach((pl, i) => {
-            if (type === 'cocina') doc.setFont(undefined, 'bold');
+            if (pl.items.length === 0) return;
+            
             pl.items.forEach(it => {
+                doc.setFont(undefined, 'bold');
                 doc.text(`${it.cantidad}x ${it.nombre.toUpperCase()}`, margin, y);
                 if (type !== 'cocina') {
+                    doc.setFont(undefined, 'normal');
                     doc.text(`$${(it.cantidad * it.precio).toFixed(2)}`, 53, y, { align: 'right' });
                 }
                 y += 4;
                 if (it.carneId) {
+                    doc.setFontSize(7);
+                    doc.setFont(undefined, 'italic');
                     doc.text(`  (${it.carneId.toUpperCase()})`, margin, y);
                     y += 4;
+                    doc.setFontSize(8);
+                    doc.setFont(undefined, 'normal');
                 }
             });
-            doc.setFont(undefined, 'normal');
             
             let extras = [];
             if (pl.sinCebolla) extras.push("S/CEB");
@@ -203,14 +216,14 @@ const printer = {
                 doc.text("NOTA: " + pl.notas, margin, y);
                 y += 4;
             }
-            y += 2;
+            y += 1;
         });
 
         if (type !== 'cocina') {
             y += 2;
-            doc.text("-".repeat(30), x, y, { align: 'center' });
-            y += 5;
-            doc.setFontSize(10);
+            doc.line(margin, y, 53, y);
+            y += 6;
+            doc.setFontSize(11);
             doc.setFont(undefined, 'bold');
             doc.text("TOTAL: $" + db.calcularTotal(pedido).toFixed(2), 53, y, { align: 'right' });
             doc.setFont(undefined, 'normal');
@@ -220,38 +233,98 @@ const printer = {
         doc.setFontSize(8);
         doc.text("¡GRACIAS POR SU PREFERENCIA!", x, y, { align: 'center' });
 
-        // Crear Modal para previsualizar y compartir
-        const pdfData = doc.output('datauristring');
+        // En APK de Android, generamos el PDF y ofrecemos compartirlo
+        const pdfBase64 = doc.output('datauristring').split(',')[1];
+        const fileName = `Ticket_${pedido.id}.pdf`;
+
         const m = document.createElement('div');
         m.className = 'modal-full';
         m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:50000; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px;";
         m.innerHTML = `
-            <div style="background:white; width:100%; max-width:400px; border-radius:20px; overflow:hidden; display:flex; flex-direction:column;">
+            <div style="background:white; width:100%; max-width:400px; border-radius:20px; overflow:hidden; display:flex; flex-direction:column; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
                 <div style="padding:15px; background:var(--primary); color:white; display:flex; justify-content:space-between; align-items:center;">
-                    <b>Vista Previa Ticket</b>
-                    <span onclick="this.parentElement.parentElement.parentElement.remove()" style="cursor:pointer; font-size:1.5rem;">×</span>
+                    <b style="font-size:0.9rem;">Ticket Generado ✓</b>
+                    <span onclick="this.parentElement.parentElement.parentElement.remove()" style="cursor:pointer; font-size:1.5rem; padding:5px;">×</span>
                 </div>
-                <iframe src="${pdfData}" style="width:100%; height:400px; border:none;"></iframe>
-                <div style="padding:20px; display:grid; gap:10px;">
-                    <button class="btn-primary" style="background:#25D366; border:none;" onclick="printer.shareWhatsApp('${pedido.cliente?.tel || ''}', '${db.calcularTotal(pedido)}')">ENVIAR POR WHATSAPP 📱</button>
-                    <button class="btn-secondary" onclick="printer.downloadPDF('${pedido.id}')">DESCARGAR PDF 📥</button>
-                    <button class="btn-secondary" style="border:none;" onclick="this.parentElement.parentElement.parentElement.remove()">CERRAR</button>
+                
+                <div style="padding:30px; text-align:center;">
+                    <div style="font-size:4rem; margin-bottom:15px;">📄</div>
+                    <h3 style="margin-bottom:10px;">${type==='cocina'?'Comanda de Cocina':'Ticket de Venta'}</h3>
+                    <p style="color:#666; font-size:0.9rem; margin-bottom:25px;">El ticket se ha generado correctamente.</p>
+                    
+                    <div style="display:grid; gap:12px;">
+                        <button class="btn-primary" style="background:#25D366; border:none; padding:15px; font-weight:bold; display:flex; align-items:center; justify-content:center; gap:10px;" 
+                                onclick="printer.shareNative('${pdfBase64}', '${fileName}', '${pedido.cliente?.tel || ''}', '${db.calcularTotal(pedido)}')">
+                            <span>📱</span> ENVIAR POR WHATSAPP
+                        </button>
+                        
+                        <button class="btn-secondary" style="padding:15px;" 
+                                onclick="printer.downloadNative('${pdfBase64}', '${fileName}')">
+                            <span>📥</span> GUARDAR EN DISPOSITIVO
+                        </button>
+                    </div>
+                </div>
+
+                <div style="padding:15px; background:#f5f5f5; text-align:center;">
+                    <button class="btn-secondary" style="border:none; color:#666; font-size:0.8rem;" onclick="this.parentElement.parentElement.parentElement.remove()">CERRAR VENTANA</button>
                 </div>
             </div>
         `;
         document.body.appendChild(m);
     },
 
-    shareWhatsApp(tel, total) {
-        const text = encodeURIComponent(`*${db.config.nombreTaqueria}*\n\nHola! Tu pedido está listo. \nTotal a pagar: *$${total}*\n\n¡Gracias por tu preferencia! 🌮`);
-        const url = tel ? `https://wa.me/52${tel}?text=${text}` : `https://wa.me/?text=${text}`;
-        window.open(url, '_blank');
+    async shareNative(base64, name, tel, total) {
+        // Lógica de compartir nativa de Capacitor
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+            try {
+                const { Share } = Capacitor.Plugins;
+                const { Filesystem, Directory } = Capacitor.Plugins;
+                
+                // 1. Guardar temporalmente el archivo para compartirlo
+                const result = await Filesystem.writeFile({
+                    path: name,
+                    data: base64,
+                    directory: Directory.Cache
+                });
+
+                // 2. Abrir hoja de compartir nativa
+                await Share.share({
+                    title: 'Ticket Taquería',
+                    text: `Ticket de venta por $${total}`,
+                    url: result.uri,
+                    dialogTitle: 'Enviar ticket via...'
+                });
+            } catch (e) {
+                console.error("Error sharing:", e);
+                // Fallback a link de WhatsApp si falla lo nativo
+                this.shareWhatsApp(tel, total);
+            }
+        } else {
+            // Fallback para pruebas en navegador
+            this.shareWhatsApp(tel, total);
+        }
     },
 
-    downloadPDF(id) {
-        // La lógica de descarga ya está implícita en el iframe, 
-        // pero podemos forzarla si es necesario volviendo a generar el doc.
-        app.showNotification("Iniciando descarga...");
+    async downloadNative(base64, name) {
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+            try {
+                const { Filesystem, Directory } = Capacitor.Plugins;
+                await Filesystem.writeFile({
+                    path: name,
+                    data: base64,
+                    directory: Directory.Documents
+                });
+                app.showNotification("📄 Guardado en Documentos");
+            } catch (e) {
+                app.showNotification("❌ Error al guardar archivo");
+            }
+        } else {
+            // Navegador: Descarga normal
+            const link = document.createElement('a');
+            link.href = 'data:application/pdf;base64,' + base64;
+            link.download = name;
+            link.click();
+        }
     },
 
     async printOrder(pedido) {
