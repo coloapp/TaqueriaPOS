@@ -109,78 +109,64 @@ const router = {
     // --- LOGIN ---
     renderLogin() {
         const content = document.getElementById('content');
-        const users = db.empleados.filter(e => e.activo);
         
         content.innerHTML = `
             <div class="login-container">
                 <div class="login-card">
-                    <div class="user-avatar" id="login-avatar">👤</div>
-                    <h2 id="login-title">Inicia Sesión</h2>
-                    <p id="login-subtitle">Selecciona tu usuario</p>
+                    <div class="user-avatar">👤</div>
+                    <h2 style="margin-bottom:5px;">Acceso Personal</h2>
+                    <p style="font-size:0.8rem; color:#666; margin-bottom:25px;">Ingresa tus credenciales</p>
                     
-                    <div class="user-selector" id="user-selector">
-                        ${users.map(u => `
-                            <div class="user-item" onclick="router.selectUserLogin(${u.id}, '${u.nombre}', '${u.puesto}')">
-                                <span class="icon">${u.puesto === 'mesero' ? '伺' : (u.puesto === 'taquero' ? '🌮' : '👤')}</span>
-                                <span class="name">${u.nombre}</span>
-                            </div>
-                        `).join('')}
-                        ${users.length === 0 ? '<div style="grid-column:1/-1; padding:20px; color:#999;">No hay empleados registrados. Usa el PIN de Admin.</div>' : ''}
+                    <div style="text-align:left;">
+                        <label style="font-size:0.8rem; font-weight:bold; color:#444;">USUARIO:</label>
+                        <input type="text" id="login-user" placeholder="Nombre de usuario" 
+                               style="width:100%; padding:15px; border:2px solid #eee; border-radius:12px; margin-bottom:15px; font-size:1rem; outline:none; transition:border-color 0.3s;">
+                        
+                        <label style="font-size:0.8rem; font-weight:bold; color:#444;">PIN:</label>
+                        <input type="password" id="login-pin-direct" placeholder="••••" maxlength="6"
+                               style="width:100%; padding:15px; border:2px solid #eee; border-radius:12px; margin-bottom:20px; font-size:1.5rem; text-align:center; letter-spacing:5px; outline:none;">
+                        
+                        <button class="btn-primary" style="width:100%; padding:15px; font-size:1.1rem; border-radius:12px;" onclick="router.handleLoginDirect()">INGRESAR</button>
                     </div>
 
-                    <div id="pin-section" style="display:none;">
-                        <input type="password" id="login-pin" placeholder="PIN" readonly 
-                               style="width:100%; padding:15px; font-size:1.5rem; text-align:center; border:2px solid #ddd; border-radius:15px; margin-bottom:20px; letter-spacing:10px;">
-                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
-                            ${[1,2,3,4,5,6,7,8,9,'C',0].map(n => `
-                                <button class="btn-secondary" style="padding:15px; font-size:1.2rem; font-weight:bold; border-radius:12px;" onclick="router._handleLoginKey('${n}')">${n}</button>
-                            `).join('')}
-                            <button class="btn-secondary" style="padding:15px; font-size:0.8rem; font-weight:bold; border-radius:12px; color:red;" onclick="router.resetLogin()">VOLVER</button>
-                        </div>
+                    <div style="margin-top:30px; padding-top:20px; border-top:1px solid #eee;">
+                        <button class="btn-secondary" style="width:100%; border:none; font-size:0.85rem; color:var(--primary); font-weight:bold;" 
+                                onclick="app.renderActivation()">⚙️ ACTIVAR ADMINISTRADOR</button>
                     </div>
                 </div>
             </div>
         `;
+        
+        // Enfocar usuario al cargar
+        setTimeout(() => {
+            const el = document.getElementById('login-user');
+            if (el) el.focus();
+        }, 300);
     },
 
-    _selectedUserId: null,
-    _loginPinBuffer: '',
+    async handleLoginDirect() {
+        const userStr = document.getElementById('login-user').value.trim();
+        const pinStr = document.getElementById('login-pin-direct').value;
 
-    selectUserLogin(id, nombre, puesto) {
-        this._selectedUserId = id;
-        this._loginPinBuffer = '';
-        document.getElementById('user-selector').style.display = 'none';
-        document.getElementById('pin-section').style.display = 'block';
-        document.getElementById('login-title').innerText = nombre;
-        document.getElementById('login-subtitle').innerText = puesto.toUpperCase();
-        document.getElementById('login-avatar').innerText = puesto === 'mesero' ? '伺' : (puesto === 'taquero' ? '🌮' : '👤');
-    },
+        if (!userStr || !pinStr) {
+            app.showNotification("⚠️ Completa todos los campos");
+            return;
+        }
 
-    resetLogin() {
-        this._selectedUserId = null;
-        this._loginPinBuffer = '';
-        this.renderLogin();
-    },
-
-    _handleLoginKey(key) {
-        const input = document.getElementById('login-pin');
-        if (key === 'C') {
-            this._loginPinBuffer = '';
+        const user = db.empleados.find(e => e.nombre.toLowerCase() === userStr.toLowerCase() && e.pin === pinStr);
+        
+        if (user) {
+            this.currentUser = user;
+            app.showNotification(`Bienvenido, ${user.nombre}`);
+            this.navigate('pos');
         } else {
-            if (this._loginPinBuffer.length < 4) this._loginPinBuffer += key;
-            if (this._loginPinBuffer.length === 4) {
-                const user = db.empleados.find(e => e.id === this._selectedUserId);
-                if (user && user.pin === this._loginPinBuffer) {
-                    this.currentUser = user;
-                    app.showNotification(`Bienvenido, ${user.nombre}`);
-                    this.navigate('pos');
-                } else {
-                    app.showNotification("❌ PIN INCORRECTO");
-                    this._loginPinBuffer = '';
-                }
+            app.showNotification("❌ Usuario o PIN incorrecto");
+            const card = document.querySelector('.login-card');
+            if (card) {
+                card.style.animation = 'shake 0.4s';
+                setTimeout(() => card.style.animation = '', 400);
             }
         }
-        if (input) input.value = this._loginPinBuffer.replace(/./g, '*');
     },
 
     renderPOS() {
