@@ -140,6 +140,7 @@ const router = {
                         
                         <label style="font-size:0.8rem; font-weight:bold; color:#444;">PIN:</label>
                         <input type="password" id="login-pin-direct" placeholder="••••" maxlength="6"
+                               oninput="if(this.value.length>=4) router.handleLoginDirect()"
                                style="width:100%; padding:15px; border:2px solid #eee; border-radius:12px; margin-bottom:20px; font-size:1.5rem; text-align:center; letter-spacing:5px; outline:none;">
                         
                         <button class="btn-primary" style="width:100%; padding:15px; font-size:1.1rem; border-radius:12px;" onclick="router.handleLoginDirect()">INGRESAR</button>
@@ -166,14 +167,6 @@ const router = {
 
         if (!userStr || !pinStr) {
             app.showNotification("⚠️ Completa todos los campos");
-            return;
-        }
-
-        // Acceso Maestro para el Dueño (si no hay usuarios o para mantenimiento)
-        if (userStr.toLowerCase() === 'admin' && pinStr === db.config.pin) {
-            this.currentUser = { id: 0, nombre: 'Dueño Maestro', puesto: 'admin', activo: 1 };
-            app.showNotification("Bienvenido, Administrador");
-            this.navigate('pos');
             return;
         }
 
@@ -841,9 +834,10 @@ const router = {
 
     showHRMCard() {
         const m = document.createElement('div'); m.className = 'modal-full';
-        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:20000;";
+        // Cambio: display block y overflow-y auto para permitir scroll con dedo
+        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:block; overflow-y:auto; z-index:20000; padding: 20px 0;";
         m.innerHTML = `
-            <div style="background:white; padding:30px; border-radius:20px; width:90%; max-width:400px;">
+            <div style="background:white; padding:30px; border-radius:20px; width:90%; max-width:400px; margin: 20px auto;">
                 <h3>Nuevo Empleado</h3>
                 <label>Nombre Completo:</label>
                 <input type="text" id="hr-n" placeholder="Ej: Juan Perez" style="width:100%; padding:12px; margin-bottom:15px; border-radius:10px; border:1px solid #ddd;">
@@ -858,7 +852,9 @@ const router = {
                 <label>Sueldo por Día:</label>
                 <input type="number" id="hr-s" placeholder="$0.00" style="width:100%; padding:12px; margin-bottom:15px; border-radius:10px; border:1px solid #ddd;">
                 <label>PIN Acceso (4 dígitos):</label>
-                <input type="password" id="hr-pin" placeholder="0000" maxlength="4" style="width:100%; padding:12px; margin-bottom:15px; border-radius:10px; border:1px solid #ddd;">
+                <input type="password" id="hr-pin" placeholder="0000" maxlength="4" 
+                       oninput="if(this.value.length===4) router.handleSaveHRM()"
+                       style="width:100%; padding:12px; margin-bottom:15px; border-radius:10px; border:1px solid #ddd;">
                 <div style="display:flex; gap:10px; margin-top:20px;">
                     <button class="btn-primary" style="flex:1;" onclick="router.handleSaveHRM()">GUARDAR</button>
                     <button class="btn-secondary" style="flex:1;" onclick="document.querySelector('.modal-full').remove()">CANCELAR</button>
@@ -1222,8 +1218,10 @@ const router = {
     },
 
     showProductCard(p = null) {
-        const m = document.createElement('div'); m.className = 'modal-full'; m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:20000;";
-        m.innerHTML = `<div style="background:white; padding:30px; border-radius:20px; width:90%; max-width:400px; text-align:left;"><h3>${p?'Editar':'Nuevo'} Producto</h3><label>Nombre:</label><input type="text" id="ed-n" value="${p?p.nombre:''}" style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #ddd;"><label>Precio:</label><input type="number" id="ed-p" value="${p?p.precio:''}" style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #ddd;"><label>Categoría:</label><select id="ed-c" style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #ddd;">${db.categorias.map(c => `<option value="${c}" ${p&&p.categoria===c?'selected':(this._selectedAdminCat===c?'selected':'')}>${c}</option>`).join('')}</select><label style="display:flex; align-items:center; gap:10px;"><input type="checkbox" id="ed-sk" ${p&&p.requiereCarne?'checked':''}> Especial (Carnes)</label><div style="display:flex; gap:10px; margin-top:25px;"><button class="btn-primary" style="flex:1;" onclick="router.handleSaveProduct(${p?p.id:'null'})">GUARDAR</button>${p?`<button class="btn-secondary" style="background:#ff4444; color:white; border:none;" onclick="router.handleDeleteProduct(${p.id})">ELIMINAR</button>`:''}</div><button class="btn-secondary" style="width:100%; margin-top:10px; border:none;" onclick="document.querySelector('.modal-full').remove()">Cerrar</button></div>`;
+        const m = document.createElement('div'); m.className = 'modal-full'; 
+        // Cambio: display block y overflow-y auto para permitir scroll con dedo
+        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:block; overflow-y:auto; z-index:20000; padding: 20px 0;";
+        m.innerHTML = `<div style="background:white; padding:30px; border-radius:20px; width:90%; max-width:400px; text-align:left; margin: 20px auto;"><h3>${p?'Editar':'Nuevo'} Producto</h3><label>Nombre:</label><input type="text" id="ed-n" value="${p?p.nombre:''}" style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #ddd;"><label>Precio:</label><input type="number" id="ed-p" value="${p?p.precio:''}" style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #ddd;"><label>Categoría:</label><select id="ed-c" style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #ddd;">${db.categorias.map(c => `<option value="${c}" ${p&&p.categoria===c?'selected':(this._selectedAdminCat===c?'selected':'')}>${c}</option>`).join('')}</select><label style="display:flex; align-items:center; gap:10px;"><input type="checkbox" id="ed-sk" ${p&&p.requiereCarne?'checked':''}> Especial (Carnes)</label><div style="display:flex; gap:10px; margin-top:25px;"><button class="btn-primary" style="flex:1;" onclick="router.handleSaveProduct(${p?p.id:'null'})">GUARDAR</button>${p?`<button class="btn-secondary" style="background:#ff4444; color:white; border:none;" onclick="router.handleDeleteProduct(${p.id})">ELIMINAR</button>`:''}</div><button class="btn-secondary" style="width:100%; margin-top:10px; border:none;" onclick="document.querySelector('.modal-full').remove()">Cerrar</button></div>`;
         document.body.appendChild(m);
     },
 

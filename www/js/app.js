@@ -5,32 +5,54 @@ const app = {
     async init() {
         console.log("App Iniciando...");
         const splash = document.getElementById('splash-screen');
-        splash.classList.add('active'); // pointer-events: all
+        splash.classList.add('active'); 
         
-        await db.init();
-        
+        // Timeout de seguridad: Si en 6 segundos no ha iniciado, forzar salida del splash
+        const emergencyTimeout = setTimeout(() => {
+            console.error("⚠️ Timeout de inicialización excedido. Forzando inicio...");
+            this.hideSplash();
+            this.startUI(localStorage.getItem('tpos_role') || 'mesero');
+        }, 6000);
+
+        try {
+            console.log("Cargando Base de Datos...");
+            await db.init();
+            
+            console.log("Iniciando Sincronización...");
+            await sync.init();
+            
+            clearTimeout(emergencyTimeout);
+            this.hideSplash();
+        } catch (e) {
+            console.error("❌ Error crítico en init:", e);
+            clearTimeout(emergencyTimeout);
+            this.hideSplash();
+            this.startUI(localStorage.getItem('tpos_role') || 'mesero');
+        }
+    },
+
+    hideSplash() {
+        const splash = document.getElementById('splash-screen');
+        if (!splash) return;
+        splash.style.opacity = '0';
         setTimeout(() => {
-            splash.style.opacity = '0';
-            setTimeout(() => {
-                splash.classList.remove('active');
-                splash.classList.add('hidden');
-                sync.init();
-            }, 600);
-        }, 1500);
+            splash.classList.remove('active');
+            splash.classList.add('hidden');
+            splash.style.display = 'none';
+        }, 600);
     },
 
     showActivationScreen() {
         // Limpiar otros modales
         const oldAct = document.getElementById('activation-screen');
         if(oldAct) oldAct.remove();
-        const oldSetup = document.getElementById('setup-modal');
-        if(oldSetup) oldSetup.remove();
-
+        
         const div = document.createElement('div');
         div.id = 'activation-screen';
-        div.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg-dark); display:flex; justify-content:center; align-items:center; z-index:16000;";
+        // Cambio: display block y overflow-y auto para permitir scroll con dedo
+        div.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg-dark); display:block; overflow-y:auto; z-index:16000; padding: 20px 0;";
         div.innerHTML = `
-            <div style="background:white; padding:30px; border-radius:var(--radius); text-align:center; max-width:450px; width:90%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <div style="background:white; padding:30px; border-radius:var(--radius); text-align:center; max-width:450px; width:90%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin: 20px auto;">
                 <h2 style="color:var(--primary); margin-bottom:10px;">Activar Taquería</h2>
                 <p style="color:#666; font-size:0.9rem; margin-bottom:25px;">Configura tu negocio para empezar.</p>
                 
@@ -41,13 +63,17 @@ const app = {
                     
                     <label style="font-size:0.75rem; font-weight:bold;">USUARIO DUEÑO/ADMIN:</label>
                     <input type="text" id="cfg-admin-user" placeholder="Nombre de usuario admin" style="width:100%; padding:12px; margin-bottom:10px; border:1px solid var(--primary); border-radius:8px;">
-                    <input type="password" id="cfg-admin-pin" placeholder="PIN de 4 dígitos" maxlength="4" style="width:100%; padding:12px; margin-bottom:20px; border:1px solid var(--primary); border-radius:8px;">
+                    <input type="password" id="cfg-admin-pin" placeholder="PIN de 4 dígitos" maxlength="4" 
+                           oninput="if(this.value.length===4) document.getElementById('activation-code').focus()"
+                           style="width:100%; padding:12px; margin-bottom:20px; border:1px solid var(--primary); border-radius:8px;">
                 </div>
 
                 <div style="background:#f5f5f5; padding:15px; border-radius:10px; margin-bottom:20px; border:1px dashed #bbb;">
                     <p style="font-size:0.75rem; margin-bottom:5px; color:#777;">ID DE EQUIPO:</p>
                     <div style="font-family:monospace; font-size:1.2rem; font-weight:bold; color:var(--primary); margin-bottom:15px;">${db.config.deviceId}</div>
-                    <input type="text" id="activation-code" placeholder="CÓDIGO DE ACTIVACIÓN" style="width:100%; padding:15px; border:1px solid var(--primary); border-radius:8px; text-align:center; font-weight:bold; letter-spacing:1px;">
+                    <input type="text" id="activation-code" placeholder="CÓDIGO DE ACTIVACIÓN" 
+                           oninput="if(this.value.length>=4) app.activarLicencia()"
+                           style="width:100%; padding:15px; border:1px solid var(--primary); border-radius:8px; text-align:center; font-weight:bold; letter-spacing:1px;">
                 </div>
 
                 <button class="btn-primary" style="width:100%; padding:18px; font-size:1.1rem;" onclick="app.activarLicencia()">ACTIVAR Y CREAR ADMIN</button>
@@ -71,20 +97,15 @@ const app = {
         if (await db.verificarActivacion(code)) {
             db.config.telefono = tel;
             db.config.direccion = dir;
-            db.config.pin = adminPin; // Actualizar PIN maestro
+            db.config.pin = adminPin; 
             await db.save();
             
-            // Crear el primer empleado administrador
             await db.addEmpleado(adminUser, 'admin', 0, adminPin);
             
-            app.showNotification("¡SISTEMA ACTIVADO Y ADMIN CREADO!");
+            app.showNotification("¡SISTEMA ACTIVADO!");
             const screen = document.getElementById('activation-screen');
             if(screen) screen.remove();
             this.startUI('caja');
-
-            if (!localStorage.getItem('tpos_tour_done')) {
-                setTimeout(() => { router.startTour(); localStorage.setItem('tpos_tour_done', 'true'); }, 1000);
-            }
         } else {
             alert("Código incorrecto");
         }
