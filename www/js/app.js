@@ -5,13 +5,13 @@ const app = {
     async init() {
         console.log("App Iniciando...");
         const splash = document.getElementById('splash-screen');
-        splash.classList.add('active'); 
+        if(splash) splash.classList.add('active'); 
         
         // Timeout de seguridad: Si en 6 segundos no ha iniciado, forzar salida del splash
         const emergencyTimeout = setTimeout(() => {
             console.error("⚠️ Timeout de inicialización excedido. Forzando inicio...");
             this.hideSplash();
-            this.startUI(localStorage.getItem('tpos_role') || 'mesero');
+            this.startUI(localStorage.getItem('tpos_role') || 'caja');
         }, 6000);
 
         try {
@@ -27,7 +27,7 @@ const app = {
             console.error("❌ Error crítico en init:", e);
             clearTimeout(emergencyTimeout);
             this.hideSplash();
-            this.startUI(localStorage.getItem('tpos_role') || 'mesero');
+            this.startUI(localStorage.getItem('tpos_role') || 'caja');
         }
     },
 
@@ -39,6 +39,10 @@ const app = {
             splash.classList.remove('active');
             splash.classList.add('hidden');
             splash.style.display = 'none';
+            // Después de ocultar splash, asegurar que startUI se llame si no se ha llamado
+            if (document.getElementById('app').classList.contains('hidden')) {
+                this.startUI(localStorage.getItem('tpos_role') || 'caja');
+            }
         }, 600);
     },
 

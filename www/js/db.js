@@ -29,7 +29,7 @@ const db = {
         bluetoothMAC: '', 
         bluetoothMAC_Cocina: '',
         usarImpresoraCocina: false,
-        activado: true,
+        activado: false,
         pin: '1234',
         pinStaff: '0000',
         deviceId: 'DEVICE-' + Math.random().toString(36).substr(2, 9).toUpperCase()
@@ -122,8 +122,7 @@ const db = {
     },
 
     async verificarActivacion(codigo) {
-        // Lógica de activación saltada por petición del usuario
-        /*
+        // Lógica: código es el deviceId al revés
         const reverseId = this.config.deviceId.split('').reverse().join('');
         if (codigo === reverseId) {
             this.config.activado = true;
@@ -131,10 +130,6 @@ const db = {
             return true;
         }
         return false;
-        */
-        this.config.activado = true;
-        await this.save();
-        return true;
     },
 
     async addEmpleado(n, p, pd, pin) {
@@ -199,6 +194,51 @@ const db = {
             const h = new Date().toLocaleTimeString();
             const u = 'SISTEMA';
             await this.dbConn.run("INSERT INTO logs_auditoria (usuario, accion, detalles, fecha, hora) VALUES (?,?,?,?,?)", [u, accion, detalles, f, h]);
+        }
+    },
+
+    async cobrarPedido(id, metodo) {
+        const p = this.pedidosActivos.find(x => x.id === id);
+        if (!p) return;
+        const total = this.calcularTotal(p, metodo === 'tarjeta');
+        p.estado = 'pagado';
+        p.metodo_pago = metodo;
+        if (this.dbConn) {
+            await this.dbConn.run("UPDATE pedidos SET estado='pagado', metodo_pago=? WHERE id=?", [metodo, id]);
+            if (this.turnoActual) {
+                await this.dbConn.run("UPDATE turnos SET ventas = ventas + ? WHERE id=?", [total, this.turnoActual.id]);
+                this.turnoActual.ventas += total;
+            }
+        }
+        this.pedidosActivos = this.pedidosActivos.filter(x => x.id !== id);
+        app.showNotification("💰 VENTA REGISTRADA");
+    },
+
+    async abrirTurno(monto) {
+        const f = new Date().toLocaleDateString();
+        const h = new Date().toLocaleTimeString();
+        if (this.dbConn) {
+            const res = await this.dbConn.run("INSERT INTO turnos (fecha, hora_inicio, inicioCaja, ventas, gastos, retiros, estado) VALUES (?,?,?,?,?,?,?)", [f, h, monto, 0, 0, 0, 'abierto']);
+            this.turnoActual = { id: res.changes.lastId, fecha: f, hora_inicio: h, inicioCaja: monto, ventas: 0, gastos: 0, retiros: 0, estado: 'abierto' };
+        } else {
+            this.turnoActual = { id: Date.now(), fecha: f, hora_inicio: h, inicioCaja: monto, ventas: 0, gastos: 0, retiros: 0, estado: 'abierto' };
+        }
+    },
+
+    async cerrarTurno() {
+        if (!this.turnoActual) return;
+        const h = new Date().toLocaleTimeString();
+        if (this.dbConn) {
+            await this.dbConn.run("UPDATE turnos SET estado='cerrado', hora_fin=? WHERE id=?", [h, this.turnoActual.id]);
+        }
+        this.turnoActual = null;
+    },
+
+    async registrarRetiro(monto, desc) {
+        if (this.dbConn && this.turnoActual) {
+            await this.dbConn.run("UPDATE turnos SET retiros = retiros + ? WHERE id=?", [monto, this.turnoActual.id]);
+            this.turnoActual.retiros += monto;
+            await this.addLog('RETIRO', `Monto: ${monto}, Motivo: ${desc}`);
         }
     }
 };

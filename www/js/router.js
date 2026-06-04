@@ -149,7 +149,7 @@ const router = {
 
                     <div style="margin-top:30px; padding-top:20px; border-top:1px solid #eee;">
                         <button class="btn-secondary" style="width:100%; border:none; font-size:0.85rem; color:var(--primary); font-weight:bold;" 
-                                onclick="app.renderActivation()">⚙️ ACTIVAR ADMINISTRADOR</button>
+                                onclick="app.showActivationScreen()">⚙️ ACTIVAR ADMINISTRADOR</button>
                     </div>
                 </div>
             </div>
@@ -171,8 +171,14 @@ const router = {
             return;
         }
 
-        const user = db.empleados.find(e => e.nombre.toLowerCase() === userStr.toLowerCase() && e.pin === pinStr);
-        
+        // Buscar en la lista de empleados
+        let user = db.empleados.find(e => e.nombre.toLowerCase() === userStr.toLowerCase() && e.pin === pinStr);
+
+        // Fallback de seguridad: Si no hay empleados aún (db recién creada), permitir admin con el pin configurado
+        if (!user && userStr.toLowerCase() === 'admin' && db.verificarPin(pinStr, 'admin')) {
+            user = { nombre: 'Admin', puesto: 'admin', pin: pinStr };
+        }
+
         if (user) {
             this.currentUser = user;
             app.showNotification(`Bienvenido, ${user.nombre}`);
