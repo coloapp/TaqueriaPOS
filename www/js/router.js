@@ -1334,8 +1334,20 @@ const router = {
                     <label style="display:flex; align-items:center; gap:10px;">
                         <input type="checkbox" id="cf-ie" ${db.config.imprimirExtras ? 'checked' : ''}> Imprimir Comandas de Extras (Ahorro Papel)
                     </label>
-                    <label>MAC Impresora Bluetooth (Android):</label>
-                    <input type="text" id="cf-bt" value="${db.config.bluetoothMAC || ''}" placeholder="00:11:22:33:44:55">
+                    <label style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+                        <input type="checkbox" id="cf-uic" ${db.config.usarImpresoraCocina ? 'checked' : ''} onchange="document.getElementById('cocina-mac-group').style.display = this.checked ? 'block' : 'none'"> 
+                        <b>USAR IMPRESORA INDEPENDIENTE EN COCINA</b>
+                    </label>
+
+                    <div style="margin-top:15px; border-left:4px solid var(--primary); padding-left:15px;">
+                        <label>MAC Impresora CAJA:</label>
+                        <input type="text" id="cf-bt" value="${db.config.bluetoothMAC || ''}" placeholder="00:11:22:33:44:55">
+                    </div>
+
+                    <div id="cocina-mac-group" style="margin-top:15px; border-left:4px solid var(--accent); padding-left:15px; display: ${db.config.usarImpresoraCocina ? 'block' : 'none'};">
+                        <label>MAC Impresora COCINA:</label>
+                        <input type="text" id="cf-bt-c" value="${db.config.bluetoothMAC_Cocina || ''}" placeholder="00:11:22:33:44:55">
+                    </div>
                     
                     <button class="btn-primary" style="margin-top:20px;" onclick="router.guardarConfig()">GUARDAR</button>
                 </div>
@@ -1355,7 +1367,9 @@ const router = {
         db.config.extraTacoPremium = parseFloat(document.getElementById('cf-etc').value) || 0;
         db.config.extraOrdenPremium = parseFloat(document.getElementById('cf-eop').value) || 0;
         db.config.imprimirExtras = document.getElementById('cf-ie').checked;
+        db.config.usarImpresoraCocina = document.getElementById('cf-uic').checked;
         db.config.bluetoothMAC = document.getElementById('cf-bt').value;
+        db.config.bluetoothMAC_Cocina = document.getElementById('cf-bt-c').value;
         await db.save(); 
         app.showNotification("Configuración Guardada");
         this.navigate('pos'); 

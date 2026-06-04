@@ -121,8 +121,14 @@ const printer = {
     async sendToPrinter(rawData, pedido = null, type = 'ticket', silent = false) {
         console.log("--- ENVIANDO A IMPRESORA (" + db.config.ticketWidth + ") ---");
         
-        // Si estamos en Chrome/Navegador o no hay MAC, ofrecer ticket virtual
-        if (!window.Capacitor || !window.Capacitor.isNativePlatform() || !db.config.bluetoothMAC) {
+        // Decidir a qué MAC enviar
+        let targetMAC = db.config.bluetoothMAC; // Default: Caja
+        if (type === 'cocina' && db.config.usarImpresoraCocina && db.config.bluetoothMAC_Cocina) {
+            targetMAC = db.config.bluetoothMAC_Cocina;
+        }
+
+        // Si estamos en Navegador o no hay MAC configurada para el destino
+        if (!window.Capacitor || !window.Capacitor.isNativePlatform() || !targetMAC) {
             if (pedido && !silent) {
                 this.showVirtualTicket(pedido, type);
             } else if (!pedido && !silent) {
@@ -132,12 +138,11 @@ const printer = {
         }
 
         try {
-            // Simulación de envío nativo vía Bluetooth
-            app.showNotification("Imprimiendo via Bluetooth...");
-            // Aquí iría la lógica real con Capacitor Bluetooth Serial
+            // Aquí iría la lógica nativa con targetMAC
+            app.showNotification(`Imprimiendo ${type} en ${targetMAC === db.config.bluetoothMAC ? 'CAJA' : 'COCINA'}...`);
         } catch (e) {
             console.error("Error Bluetooth:", e);
-            if (pedido) this.showVirtualTicket(pedido, type);
+            if (pedido && !silent) this.showVirtualTicket(pedido, type);
         }
     },
 
