@@ -95,6 +95,7 @@ const db = {
             CREATE TABLE IF NOT EXISTS asistencia (id INTEGER PRIMARY KEY AUTOINCREMENT, empleado_id INTEGER, fecha TEXT NOT NULL, hora_entrada TEXT, pago_acordado REAL, estado TEXT DEFAULT 'presente');
             CREATE TABLE IF NOT EXISTS adelantos (id INTEGER PRIMARY KEY AUTOINCREMENT, empleado_id INTEGER, monto REAL NOT NULL, fecha TEXT NOT NULL, hora TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS logs_agotados (id INTEGER PRIMARY KEY AUTOINCREMENT, carne TEXT, fecha TEXT, hora TEXT);
+            CREATE TABLE IF NOT EXISTS logs_auditoria (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, hora TEXT, usuario TEXT, accion TEXT, detalles TEXT);
         `;
         await this.execute(schema);
         const res = await this.query("SELECT count(*) as count FROM productos");
@@ -197,6 +198,7 @@ const db = {
         const turno = { fechaApertura: new Date().toLocaleString(), inicioCaja: parseFloat(m) || 0, ventas: 0, gastos: 0, estado: 'abierto' };
         const res = await this.run("INSERT INTO turnos (fechaApertura, inicioCaja, ventas, gastos, estado) VALUES (?, ?, ?, ?, ?)", [turno.fechaApertura, turno.inicioCaja, 0, 0, 'abierto']);
         turno.id = res.changes.lastId; this.turnoActual = turno; this.turnos.push(turno);
+        await this.addLog('APERTURA CAJA', `Inicio: $${m}`);
     },
 
     async cerrarTurno(m) {
@@ -207,6 +209,7 @@ const db = {
         await this.run("UPDATE turnos SET fechaCierre=?, finCaja=?, esperado=?, descuadre=?, estado=? WHERE id=?", [t.fechaCierre, t.finCaja, t.esperado, t.descuadre, 'cerrado', t.id]);
         await this.run("UPDATE carnes SET disponible = 1");
         this.carnes.forEach(c => c.disponible = true);
+        await this.addLog('CORTE FINAL', `Físico: $${m}, Esperado: $${t.esperado}, Descuadre: $${t.descuadre}`);
         this.turnoActual = null;
     },
 
@@ -229,6 +232,7 @@ const db = {
         } else {
             const res = await this.run("INSERT INTO pedidos (id, mesa_id, tipo, estado, cliente_nombre, cliente_telefono, total) VALUES (?, ?, ?, ?, ?, ?, ?)", [pedido.id || null, pedido.mesaId, pedido.tipo, pedido.estado, pedido.cliente?.nombre || '', pedido.cliente?.tel || '', total]);
             if (!pedido.id) pedido.id = res.changes.lastId;
+            await this.addLog('NUEVO PEDIDO', `ID: ${pedido.id}, Tipo: ${pedido.tipo}, Mesa: ${pedido.mesaNumero || 'N/A'}, Total: $${total}`);
         }
         for (let i = 0; i < pedido.platos.length; i++) {
             const pl = pedido.platos[i];
@@ -250,6 +254,7 @@ const db = {
             await this.run("UPDATE pedidos SET estado = 'pagado', total = ?, metodo_pago = ? WHERE id = ?", [totalFinal, metodo, id]);
             if (this.turnoActual) { this.turnoActual.ventas += totalFinal; await this.run("UPDATE turnos SET ventas = ? WHERE id = ?", [this.turnoActual.ventas, this.turnoActual.id]); }
             if (p.tipo === 'mesa') await this.updateMesa(p.mesaId, { estado: 'libre' });
+            await this.addLog('COBRO', `ID: ${id}, Método: ${metodo}, Total: $${totalFinal}`);
             return true;
         }
         return false;
@@ -257,7 +262,10 @@ const db = {
 
     async updatePedidoEstado(id, est) {
         const idx = this.pedidosActivos.findIndex(p => p.id === id);
-        if (idx !== -1) { this.pedidosActivos[idx].estado = est; await this.run("UPDATE pedidos SET estado = ? WHERE id = ?", [est, id]); return true; }
+        if (idx !== -1) { this.pedidosActivos[idx].estado = est; await this.run("UPDATE pedidos SET estado = ? WHERE id = ?", [est, id]); 
+            await this.addLog('ESTADO PEDIDO', `ID: ${id}, Nuevo estado: ${est}`);
+            return true; 
+        }
         return false;
     },
 
@@ -307,6 +315,7 @@ const db = {
             this.turnoActual.retiros = (this.turnoActual.retiros || 0) + monto;
             await this.run("UPDATE turnos SET retiros = ? WHERE id = ?", [this.turnoActual.retiros, this.turnoActual.id]);
         }
+        await this.addLog('RETIRO CAJA', `Monto: $${monto}, Motivo: ${motivo}`);
     },
 
     async addGasto(g) {
@@ -318,6 +327,7 @@ const db = {
             this.turnoActual.gastos += g.monto;
             await this.run("UPDATE turnos SET gastos = ? WHERE id = ?", [this.turnoActual.gastos, this.turnoActual.id]);
         }
+        await this.addLog('GASTO/EGRESO', `Monto: $${g.monto}, Desc: ${g.descripcion}, Estado: ${g.estado}`);
     },
 
     async pagarGastoPendiente(id) {
@@ -437,6 +447,13 @@ const db = {
     verificarLoginEmpleado(n, p) { return this.empleados.find(e => e.nombre === n && e.pin === p); },
     async registrarAsistencia(id, pd) { const hoy = new Date().toLocaleDateString(); const h = new Date().toLocaleTimeString(); const check = await this.query("SELECT id FROM asistencia WHERE empleado_id = ? AND fecha = ?", [id, hoy]); if (check.values.length > 0) return false; await this.run("INSERT INTO asistencia (empleado_id, fecha, hora_entrada, pago_acordado) VALUES (?, ?, ?, ?)", [id, hoy, h, pd]); if (this.turnoActual) await this.addGasto({ monto: pd, descripcion: `Sueldo: ${id}` }); return true; },
     async addAdelanto(id, m) { const hoy = new Date().toLocaleDateString(); const h = new Date().toLocaleTimeString(); await this.run("INSERT INTO adelantos (empleado_id, monto, fecha, hora) VALUES (?, ?, ?, ?)", [id, m, hoy, h]); await this.addGasto({ monto: m, descripcion: `Adelanto: ${id}` }); },
+
+    async addLog(accion, detalles) {
+        const f = new Date().toLocaleDateString();
+        const h = new Date().toLocaleTimeString();
+        const u = router.currentUser ? router.currentUser.nombre : 'SISTEMA';
+        await this.run("INSERT INTO logs_auditoria (fecha, hora, usuario, accion, detalles) VALUES (?, ?, ?, ?, ?)", [f, h, u, accion, detalles]);
+    },
 
     async generarPDFCorte() {
         const { jsPDF } = window.jspdf; const doc = new jsPDF(); let y = 20;

@@ -113,14 +113,21 @@ const app = {
 
         // El menú lateral ahora es visible para ambos roles por petición del usuario
         sidebarMenu.innerHTML = `
+            <div class="sidebar-item" onclick="router.navigate('pos')"><span>🛒</span> POS Ventas</div>
+            <div class="sidebar-item" onclick="router.navigate('mesas')"><span>📍</span> Mapa de Mesas</div>
+            <div class="sidebar-item" onclick="router.navigate('cocina')"><span>👨‍🍳</span> Monitor Cocina</div>
+            
+            <div style="margin-top:15px; padding:10px; font-size:0.7rem; color:#999; border-top:1px solid #eee; font-weight:bold;">ADMINISTRACIÓN</div>
             <div class="sidebar-item" onclick="router.navigate('admin_dashboard')"><span>📊</span> Dashboard</div>
-            <div class="sidebar-item" onclick="router.navigate('admin_informes')"><span>📈</span> Informes</div>
-            <div class="sidebar-item" id="btn-catalogo-nav" onclick="router.navigate('admin_productos')"><span>🌮</span> Catálogo</div>
-            <div class="sidebar-item" onclick="router.navigate('admin_carnes')"><span>🥩</span> Carnes</div>
-            <div class="sidebar-item" onclick="router.navigate('admin_croquis')"><span>📐</span> Mesas</div>
-            <div class="sidebar-item" onclick="router.navigate('admin_gastos')"><span>💸</span> Gastos</div>
-            <div class="sidebar-item" onclick="router.navigate('admin_hrm')"><span>👥</span> Personal</div>
-            <div class="sidebar-item" id="btn-config-nav" onclick="router.navigate('config')"><span>⚙️</span> Ajustes</div>
+            <div class="sidebar-item" onclick="router.navigate('admin_informes')"><span>📈</span> Historial Ventas</div>
+            <div class="sidebar-item" id="btn-catalogo-nav" onclick="router.navigate('admin_productos')"><span>🌮</span> Catálogo Menu</div>
+            <div class="sidebar-item" onclick="router.navigate('admin_carnes')"><span>🥩</span> Inventario Carnes</div>
+            <div class="sidebar-item" onclick="router.navigate('admin_croquis')"><span>📐</span> Editor de Mesas</div>
+            <div class="sidebar-item" onclick="router.navigate('admin_gastos')"><span>💸</span> Gastos y Egresos</div>
+            <div class="sidebar-item" onclick="router.navigate('admin_hrm')"><span>👥</span> Personal y Sueldos</div>
+            <div class="sidebar-item" onclick="router.navigate('admin_logs')"><span>📝</span> Auditoría (Logs)</div>
+            <div class="sidebar-item" id="btn-config-nav" onclick="router.navigate('config')"><span>⚙️</span> Configuración</div>
+            <div class="sidebar-item" style="color:red; margin-top:20px; border-top:1px solid #eee;" onclick="location.reload()"><span>🚪</span> Cerrar Sesión</div>
         `;
     }
 };

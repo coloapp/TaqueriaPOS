@@ -25,11 +25,18 @@ const router = {
         }
 
         // Restricción: Solo admin puede ver Dashboard e Informes
-        const adminViews = ['admin_dashboard', 'admin_informes', 'admin_gastos', 'admin_hrm', 'config'];
+        const adminViews = ['admin_dashboard', 'admin_informes', 'admin_hrm', 'config'];
         if (adminViews.includes(view) && this.currentUser.puesto !== 'admin') {
             app.showNotification("🚫 Acceso restringido solo para Administrador");
             this.navigate('pos');
             return;
+        }
+
+        // Permitir a cajero entrar a gastos
+        if (view === 'admin_gastos' && !['admin', 'cajero'].includes(this.currentUser.puesto)) {
+             app.showNotification("🚫 Acceso restringido");
+             this.navigate('pos');
+             return;
         }
 
         switch(view) {
@@ -45,6 +52,7 @@ const router = {
             case 'admin_croquis': this.renderEditorCroquis(); break;
             case 'admin_hrm': this.renderHRM(); break;
             case 'admin_informes': this.renderInformes(); break;
+            case 'admin_logs': this.renderLogs(); break;
             case 'admin_productos': this.renderCatalogo(); break;
             case 'config': this.renderConfig(); break;
             default: this.renderPOS();
@@ -364,8 +372,12 @@ const router = {
     },
 
     eliminarItem(idxItem) {
-        const action = () => {
+        const item = this.ordenActual.platos[this.currentPlatoIdx].items[idxItem];
+        const action = async () => {
             this.ordenActual.platos[this.currentPlatoIdx].items.splice(idxItem, 1);
+            if (this.ordenActual.id) {
+                await db.addLog('ELIMINACIÓN ITEM', `Pedido: ${this.ordenActual.id}, Item: ${item.nombre}, Cant: ${item.cantidad}`);
+            }
             this.refreshOrderList();
         };
 
@@ -423,10 +435,13 @@ const router = {
     },
 
     eliminarPlatoEspecifico(idx) {
-        const action = () => {
+        const action = async () => {
             if (this.ordenActual.platos.length > 1) {
                 this.ordenActual.platos.splice(idx, 1);
                 this.currentPlatoIdx = Math.max(0, this.currentPlatoIdx - 1);
+                if (this.ordenActual.id) {
+                    await db.addLog('ELIMINACIÓN PLATO', `Pedido: ${this.ordenActual.id}, Index: ${idx}`);
+                }
                 this.renderOrderPanel();
             } else {
                 this.ordenActual.platos[0].items = [];
@@ -601,17 +616,26 @@ const router = {
         const mesas = db.pedidosActivos.filter(p => p.tipo === 'mesa');
         const otros = db.pedidosActivos.filter(p => p.tipo !== 'mesa');
         const t = db.turnoActual;
+        const efectivoActual = (t.inicioCaja + t.ventas - t.gastos - (t.retiros || 0));
+        const mostrarAlerta = efectivoActual >= 2000;
 
         content.innerHTML = `
             <div style="padding:15px; height:100%; display:flex; flex-direction:column;" class="scrollable-y">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                     <h2 style="color:var(--primary); margin:0;">Caja</h2>
-                    ${this.currentUser.puesto === 'admin' ? '<button class="btn-accent" style="padding:8px 15px;" onclick="router.showRetiroModal()">💸 RETIRO SEGURIDAD</button>' : ''}
+                    <button class="btn-accent" style="padding:8px 15px;" onclick="router.askForPin('admin', () => router.showRetiroModal())">💸 RETIRO SEGURIDAD</button>
                 </div>
+
+                ${mostrarAlerta ? `
+                    <div style="background:#ff5252; color:white; padding:15px; border-radius:10px; margin-bottom:15px; font-weight:bold; text-align:center; animation: pulse 2s infinite;">
+                        ⚠️ EXCESO DE EFECTIVO ($${efectivoActual.toFixed(2)})<br>
+                        REALICE RETIRO PARCIAL
+                    </div>
+                ` : ''}
 
                 ${this.currentUser.puesto === 'admin' ? `
                 <div style="background:#fff9f0; padding:12px; border-radius:10px; margin-bottom:15px; border:1px solid #ffe0b2; display:flex; justify-content:space-between;">
-                    <div>En Caja: <b>$${(t.inicioCaja + t.ventas - t.gastos - (t.retiros || 0)).toFixed(2)}</b></div>
+                    <div>En Caja: <b>$${efectivoActual.toFixed(2)}</b></div>
                     <div style="color:#e65100;">Retiros: <b>-$${(t.retiros || 0).toFixed(2)}</b></div>
                 </div>
                 ` : ''}
@@ -627,6 +651,35 @@ const router = {
                 </div>
                 
                 <button class="btn-primary" style="margin-top:30px; background:#333;" onclick="router.askForPin('admin', () => router.cerrarCajaModal())">REALIZAR CORTE FINAL</button>
+            </div>
+        `;
+    },
+
+    async renderLogs() {
+        const content = document.getElementById('content');
+        const res = await db.query("SELECT * FROM logs_auditoria ORDER BY id DESC LIMIT 200");
+        const logs = res.values || [];
+
+        content.innerHTML = `
+            <div style="padding:15px; height:100%;" class="scrollable-y">
+                <h2 style="color:var(--primary);">Registro de Auditoría (Logs)</h2>
+                <div style="background:white; border-radius:15px; padding:10px; box-shadow:var(--shadow);">
+                    <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
+                        <thead style="background:#f5f5f5;">
+                            <tr><th style="padding:10px; text-align:left;">FECHA/HORA</th><th>USUARIO</th><th>ACCIÓN</th><th style="text-align:right;">DETALLES</th></tr>
+                        </thead>
+                        <tbody>
+                            ${logs.map(l => `
+                                <tr style="border-bottom:1px solid #eee;">
+                                    <td style="padding:10px; color:#666;">${l.fecha}<br>${l.hora}</td>
+                                    <td><b>${l.usuario}</b></td>
+                                    <td style="color:var(--primary); font-weight:bold;">${l.accion}</td>
+                                    <td style="text-align:right; max-width:150px; overflow:hidden; text-overflow:ellipsis;">${l.detalles}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
     },
