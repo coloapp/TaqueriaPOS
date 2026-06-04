@@ -122,7 +122,8 @@ const db = {
     },
 
     async verificarActivacion(codigo) {
-        // Lógica: código es el deviceId al revés
+        // Lógica de activación saltada por petición del usuario
+        /*
         const reverseId = this.config.deviceId.split('').reverse().join('');
         if (codigo === reverseId) {
             this.config.activado = true;
@@ -130,6 +131,10 @@ const db = {
             return true;
         }
         return false;
+        */
+        this.config.activado = true;
+        await this.save();
+        return true;
     },
 
     async addEmpleado(n, p, pd, pin) {
