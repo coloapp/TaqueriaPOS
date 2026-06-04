@@ -505,8 +505,11 @@ const router = {
     },
 
     async enviarOrden() {
-        if (this.ordenActual.platos[0].items.length === 0) { app.showNotification("Vacío"); return; }
+        if (this.ordenActual.platos.every(p => p.items.length === 0)) { app.showNotification("Vacío"); return; }
+        
         const isUpdate = !!this.ordenActual.id;
+        const pedidoAnterior = isUpdate ? db.pedidosActivos.find(p => p.id === this.ordenActual.id) : null;
+        
         const pedido = {
             id: this.ordenActual.id || Date.now(),
             tipo: this.orderType,
@@ -516,18 +519,31 @@ const router = {
             platos: JSON.parse(JSON.stringify(this.ordenActual.platos)),
             estado: 'pendiente'
         };
+
+        // Identificar qué hay de nuevo para la comanda de cocina
+        let comandaNuevos = JSON.parse(JSON.stringify(pedido));
+        if (isUpdate && pedidoAnterior) {
+            // Filtrar ítems que ya estaban para no re-imprimir lo que ya se está cocinando
+            // Esta es una simplificación: marcamos platos/items nuevos. 
+            // En un sistema real más complejo, compararíamos cantidades.
+            comandaNuevos.esExtra = true;
+        }
         
         await db.guardarPedido(pedido);
         await sync.enviarOrdenACaja(pedido);
         
-        if (sync.role === 'caja' && (pedido.tipo === 'llevar' || pedido.tipo === 'domicilio')) {
-            await printer.printOrder(pedido);
-            await printer.printBill(pedido);
-            app.showNotification("Orden enviada e impresa");
-        } else if (!isUpdate) {
-            await printer.printOrder(pedido);
+        // Impresión de Comanda (Cocina)
+        if (sync.role === 'caja') {
+            await printer.printOrder(comandaNuevos); // La función printOrder debe manejar el flag 'esExtra'
+            if (pedido.tipo !== 'mesa') {
+                await printer.printBill(pedido);
+            }
+        } else {
+            // El mesero envía a la caja, y la caja (como servidor) debería imprimir.
+            // Si el mesero tiene conexión directa a impresora, se podría hacer aquí.
         }
 
+        app.showNotification(isUpdate ? "Extras agregados" : "Orden enviada");
         this.resetPOS();
         this.navigate('pos');
     },

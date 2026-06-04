@@ -23,31 +23,43 @@ const printer = {
     },
 
     formatKitchenOrder(pedido) {
-        const mesero = localStorage.getItem('tpos_device_name') || 'TERMINAL';
+        const mesero = router.currentUser ? router.currentUser.nombre : 'TERMINAL';
         const chars = this.getCharsPerLine();
+        const esExtra = pedido.esExtra || false;
         
         let t = this.INIT + this.CENTER;
         t += this.BOLD_ON + this.SIZE_LARGE;
+        t += (esExtra ? "!!! EXTRAS !!!\n" : "");
         t += (pedido.tipo === 'mesa' ? "MESA " + pedido.mesaNumero : pedido.tipo.toUpperCase()) + "\n";
-        t += this.SIZE_NORMAL + mesero + "\n" + this.BOLD_OFF;
-        t += this.drawLine();
+        t += this.SIZE_NORMAL + "MESERO: " + mesero.toUpperCase() + "\n" + this.BOLD_OFF;
+        t += "FECHA: " + new Date().toLocaleTimeString() + "\n";
+        t += "================================\n"; // Raya de inicio (el papelito)
         t += this.LEFT;
 
         pedido.platos.forEach((plato, i) => {
-            if (i > 0) t += this.drawLine();
+            if (plato.items.length === 0) return;
             
             t += this.BOLD_ON + "PLATO " + (i + 1) + "\n" + this.BOLD_OFF;
-            if (plato.sinCebolla || plato.sinCilantro) {
-                t += "NOTAS: " + (plato.sinCebolla ? "S/ CEB " : "") + (plato.sinCilantro ? "S/ CIL" : "") + "\n";
-            }
             
             plato.items.forEach(it => {
-                t += this.BOLD_ON + it.cantidad + " " + it.nombre.toUpperCase() + this.BOLD_OFF + "\n";
-                if(it.notas) t += "  > " + it.notas + "\n";
+                // Si es un pedido de extras, podríamos marcar los nuevos. 
+                // Por ahora imprimimos el plato completo con el formato de raya.
+                t += this.SIZE_LARGE + it.cantidad + " " + it.nombre.toUpperCase();
+                if (it.carneId) t += " (" + it.carneId.toUpperCase() + ")";
+                t += this.SIZE_NORMAL + "\n";
+                if(it.conQueso) t += "  + CON QUESO\n";
             });
+
+            let notasV = [];
+            if (plato.sinCebolla) notasV.push("S/ CEB");
+            if (plato.sinCilantro) notasV.push("S/ CIL");
+            if (plato.sinVerdura) notasV.push("S/ VER");
+            if (notasV.length > 0) t += this.BOLD_ON + ">> " + notasV.join(' ') + "\n" + this.BOLD_OFF;
+            if (plato.notas) t += "NOTA: " + plato.notas + "\n";
+
+            t += "--------------------------------\n"; // Raya divisoria horizontal entre platos
         });
 
-        t += this.drawLine();
         t += "\n\n\n\n" + this.GS + "V" + "\u0041" + "\u0000"; // Corte de papel
         return t;
     },
