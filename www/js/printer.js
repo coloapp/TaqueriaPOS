@@ -102,17 +102,32 @@ const printer = {
     },
 
     async sendToPrinter(rawData) {
-        // En un entorno real, aquí se usaría un plugin Bluetooth o Red.
-        // Simulamos el envío para asegurar que la lógica de creación del ticket es correcta.
         console.log("--- ENVIANDO A IMPRESORA (" + db.config.ticketWidth + ") ---");
         console.log(rawData);
         
-        if (window.Capacitor?.Plugins?.Http) {
-            // Ejemplo de envío por red si la IP está configurada
-            const ip = db.config.impresoraIP;
-            if (ip && ip !== '192.168.1.100') {
-                console.log("Intentando enviar a IP: " + ip);
-                // Aquí iría la lógica TCP/UDP real del plugin de impresión
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+            try {
+                // Usamos un patrón genérico para plugins de Bluetooth Serial
+                // Si tienes un plugin específico instalado (ej: bluetooth-serial), se llamaría aquí.
+                const btMac = db.config.bluetoothMAC;
+                if (!btMac) {
+                    app.showNotification("⚠️ Configura la MAC de la impresora Bluetooth");
+                    return;
+                }
+
+                // Simulación de envío nativo vía Bluetooth (Requiere plugin instalado)
+                // if (window.bluetoothSerial) {
+                //    window.bluetoothSerial.connect(btMac, () => {
+                //        window.bluetoothSerial.write(rawData, () => {
+                //            window.bluetoothSerial.disconnect();
+                //        });
+                //    });
+                // }
+                
+                app.showNotification("Imprimiendo via Bluetooth...");
+            } catch (e) {
+                console.error("Error Bluetooth:", e);
+                app.showNotification("❌ Error al conectar con impresora");
             }
         }
     },

@@ -36,7 +36,8 @@ const db = {
         bancoClabe: '',
         bancoBeneficiario: '',
         extraTacoPremium: 6,   // Diferencia entre $19 y $25
-        extraOrdenPremium: 30  // Plus para órdenes/especiales
+        extraOrdenPremium: 30,  // Plus para órdenes/especiales
+        imprimirExtras: false // Control de impresión de ítems adicionales
     },
 
     async init() {

@@ -534,7 +534,10 @@ const router = {
         
         // Impresión de Comanda (Cocina)
         if (sync.role === 'caja') {
-            await printer.printOrder(comandaNuevos); // La función printOrder debe manejar el flag 'esExtra'
+            const debeImprimir = !isUpdate || (isUpdate && db.config.imprimirExtras);
+            if (debeImprimir) {
+                await printer.printOrder(comandaNuevos);
+            }
             if (pedido.tipo !== 'mesa') {
                 await printer.printBill(pedido);
             }
@@ -1299,6 +1302,13 @@ const router = {
                     <label>Extra Orden Premium ($):</label>
                     <input type="number" id="cf-eop" value="${db.config.extraOrdenPremium || 30}" placeholder="Ej: 30">
 
+                    <h3 style="margin-top:20px; border-bottom:1px solid #eee; padding-bottom:5px;">Opciones de Impresión</h3>
+                    <label style="display:flex; align-items:center; gap:10px;">
+                        <input type="checkbox" id="cf-ie" ${db.config.imprimirExtras ? 'checked' : ''}> Imprimir Comandas de Extras (Ahorro Papel)
+                    </label>
+                    <label>MAC Impresora Bluetooth (Android):</label>
+                    <input type="text" id="cf-bt" value="${db.config.bluetoothMAC || ''}" placeholder="00:11:22:33:44:55">
+                    
                     <button class="btn-primary" style="margin-top:20px;" onclick="router.guardarConfig()">GUARDAR</button>
                 </div>
             </div>
@@ -1316,6 +1326,8 @@ const router = {
         db.config.pinStaff = document.getElementById('cf-ps').value;
         db.config.extraTacoPremium = parseFloat(document.getElementById('cf-etc').value) || 0;
         db.config.extraOrdenPremium = parseFloat(document.getElementById('cf-eop').value) || 0;
+        db.config.imprimirExtras = document.getElementById('cf-ie').checked;
+        db.config.bluetoothMAC = document.getElementById('cf-bt').value;
         await db.save(); 
         app.showNotification("Configuración Guardada");
         this.navigate('pos'); 
