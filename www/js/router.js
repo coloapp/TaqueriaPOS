@@ -217,7 +217,7 @@ const router = {
                 <div class="order-side" id="order-side"></div>
             </div>
 
-            <div class="floating-actions">
+            <div class="floating-actions" id="pos-floating-actions">
                 <div class="btn-float add-plato" onclick="router.nuevoPlato()">🍽️+</div>
                 <div class="btn-float cart" onclick="router.toggleMobileOrder()" id="cart-float-btn">🛒</div>
             </div>
@@ -340,61 +340,42 @@ const router = {
         this._loncheQueso = false;
     },
 
-    // --- POS (Punto de Venta) ---
-
     renderOrderPanel() {
         const container = document.getElementById('order-side');
         if (!container) return;
         const isUpdate = !!this.ordenActual.id;
         
         container.innerHTML = `
-            <div style="padding:8px; background:#eee; display:flex; gap:4px; flex-shrink:0;">
-                <button class="btn-type ${this.orderType==='mesa'?'active':''}" onclick="router.setOrderType('mesa')" style="padding:6px; font-size:0.75rem;">Mesa</button>
-                <button class="btn-type ${this.orderType==='llevar'?'active':''}" onclick="router.setOrderType('llevar')" style="padding:6px; font-size:0.75rem;">Llevar</button>
-                <button class="btn-type ${this.orderType==='domicilio'?'active':''}" onclick="router.setOrderType('domicilio')" style="padding:6px; font-size:0.75rem;">🛵 Dom</button>
+            <div style="background:var(--primary); color:white; padding:15px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+                <b style="font-size:0.9rem;">${this.orderType.toUpperCase()} ${this.currentMesa ? '#'+this.currentMesa.numero : ''}</b>
+                <div style="display:flex; gap:15px; align-items:center;">
+                    <button class="btn-accent" onclick="router.nuevoPlato()" style="padding:5px 12px; font-size:0.75rem; font-weight:bold; border-radius:8px;">+ PLATO</button>
+                    <span onclick="router.toggleMobileOrder()" style="cursor:pointer; font-size:1.8rem; font-weight:bold; padding:0 5px; line-height:1;">&gt;</span>
+                </div>
             </div>
-            <div id="cliente-data" style="padding:10px; background:white; border-bottom:1px solid #ddd; ${this.orderType!=='domicilio'?'display:none':''}">
+
+            <div style="padding:8px; background:#eee; display:flex; gap:4px; flex-shrink:0;">
+                <button class="btn-type ${this.orderType==='mesa'?'active':''}" onclick="router.setOrderType('mesa')" style="flex:1; padding:6px; font-size:0.75rem;">Mesa</button>
+                <button class="btn-type ${this.orderType==='llevar'?'active':''}" onclick="router.setOrderType('llevar')" style="flex:1; padding:6px; font-size:0.75rem;">Llevar</button>
+                <button class="btn-type ${this.orderType==='domicilio'?'active':''}" onclick="router.setOrderType('domicilio')" style="flex:1; padding:6px; font-size:0.75rem;">🛵 Dom</button>
+            </div>
+
+            <div id="cliente-data" style="padding:10px; background:white; border-bottom:1px solid #ddd; flex-shrink:0; ${this.orderType!=='domicilio'?'display:none':''}">
                 <input type="text" id="cli-nom" placeholder="Dirección / Referencia" style="width:100%; margin-bottom:5px; padding:10px; border-radius:8px; border:1px solid #ccc;" value="${this.cliente.nombre}" onchange="router.cliente.nombre=this.value">
                 <input type="text" id="cli-tel" placeholder="Teléfono" style="width:100%; padding:10px; border-radius:8px; border:1px solid #ccc;" value="${this.cliente.tel}" onchange="router.cliente.tel=this.value">
             </div>
-            <div style="padding:10px; background:var(--primary); color:white; font-weight:bold; display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:0.8rem;">${this.orderType.toUpperCase()} ${this.currentMesa ? '#'+this.currentMesa.numero : ''}</span>
-                <button class="btn-accent" onclick="router.nuevoPlato()" style="padding:4px 10px;">+ Plato</button>
-            </div>
-            <div id="platos-lista" class="scrollable-y" style="flex:1;"></div>
-            <div style="padding:15px; border-top:1px solid #ddd; background:#f9f9f9;">
-                <div id="order-total" style="font-size:1.4rem; font-weight:bold; text-align:right; margin-bottom:10px;">Total: $0</div>
-                <div style="display:flex; gap:10px;">
-                    <button class="btn-primary" style="flex:2; padding:12px;" onclick="router.enviarOrden()">${isUpdate?'EXTRAS':'ENVIAR'}</button>
-                    ${isUpdate ? `<button class="btn-secondary" style="flex:1; color:var(--accent); border-color:var(--accent);" onclick="router.pedirCuentaMesa()">📄</button>` : ''}
+
+            <div id="platos-lista" class="scrollable-y" style="flex:1; background:#f5f5f5;"></div>
+
+            <div style="padding:15px; border-top:1px solid #ddd; background:white; box-shadow: 0 -5px 15px rgba(0,0,0,0.05); flex-shrink:0;">
+                <div id="order-total" style="font-size:1.4rem; font-weight:bold; text-align:right; margin-bottom:10px; color:var(--primary);">Total: $0</div>
+                <div style="display:grid; grid-template-columns: 2fr 1fr; gap:10px;">
+                    <button class="btn-primary" style="padding:15px; font-weight:bold; font-size:1rem;" onclick="router.enviarOrden()">${isUpdate?'EXTRAS':'ENVIAR'}</button>
+                    ${isUpdate ? `<button class="btn-secondary" style="color:var(--accent); border-color:var(--accent); font-size:1.2rem;" onclick="router.pedirCuentaMesa()">📄</button>` : ''}
                 </div>
             </div>
-            <div id="pos-mobile-toggle" onclick="router.toggleMobileOrder()">🛒</div>
         `;
         this.refreshOrderList();
-    },
-
-    _lastClickTime: 0,
-    _lastProdId: null,
-
-    addToOrder(prod) {
-        const now = Date.now();
-        const isDoubleClick = (now - this._lastClickTime < 350) && (this._lastProdId === prod.id);
-        
-        this._lastClickTime = now;
-        this._lastProdId = prod.id;
-
-        if (isDoubleClick) {
-            // Ya se agregó uno por el primer click, agregamos el segundo rápido
-            this._addItemToOrder(prod, this._lastCarneId || null, this._lastIsPremium || false);
-            return;
-        }
-
-        if (prod.requiereCarne) {
-            this.showMeatSelector(prod);
-        } else {
-            this._addItemToOrder(prod);
-        }
     },
 
     _addItemToOrder(prod, carneId = null, isPremium = false) {
@@ -488,7 +469,6 @@ const router = {
 
     selectPlato(idx) { 
         this.currentPlatoIdx = idx; 
-        // Solo refrescamos la lista para mostrar el estado activo, no todo el panel
         const cards = document.querySelectorAll('.plato-card');
         cards.forEach((c, i) => c.classList.toggle('active', i === idx));
     },
@@ -526,7 +506,16 @@ const router = {
     nuevoPlato() { 
         this.ordenActual.platos.push({ items: [], sinCebolla: false, sinCilantro: false, sinVerdura: false, notas: '' }); 
         this.currentPlatoIdx = this.ordenActual.platos.length - 1; 
-        this.renderOrderPanel(); 
+        this.renderOrderPanel();
+        
+        // Enfocar el nuevo plato y hacer scroll
+        setTimeout(() => {
+            const list = document.getElementById('platos-lista');
+            if (list) list.scrollTop = list.scrollHeight;
+            
+            const cards = document.querySelectorAll('.plato-card');
+            cards.forEach((c, i) => c.classList.toggle('active', i === this.currentPlatoIdx));
+        }, 50);
     },
 
     toggleSwitch(idx, field) { 
@@ -540,12 +529,18 @@ const router = {
     },
     toggleMobileOrder() { 
         const side = document.getElementById('order-side'); 
+        const floatActions = document.getElementById('pos-floating-actions');
+        
         side.classList.toggle('mobile-active'); 
-        document.getElementById('pos-mobile-toggle').innerText = side.classList.contains('mobile-active') ? '❌' : '🛒'; 
+        
+        if (side.classList.contains('mobile-active')) {
+            floatActions.style.display = 'none';
+        } else {
+            floatActions.style.display = 'flex';
+        }
     },
 
     updateTotal() {
-        // Enviar orden ficticia a db.calcularTotal para obtener precio real con reglas de negocio
         const total = db.calcularTotal({ ...this.ordenActual, cliente: this.cliente });
         const el = document.getElementById('order-total');
         if (el) el.innerText = `Total: $${total.toFixed(2)}`;
@@ -567,19 +562,14 @@ const router = {
             estado: 'pendiente'
         };
 
-        // Identificar qué hay de nuevo para la comanda de cocina
         let comandaNuevos = JSON.parse(JSON.stringify(pedido));
         if (isUpdate && pedidoAnterior) {
-            // Filtrar ítems que ya estaban para no re-imprimir lo que ya se está cocinando
-            // Esta es una simplificación: marcamos platos/items nuevos. 
-            // En un sistema real más complejo, compararíamos cantidades.
             comandaNuevos.esExtra = true;
         }
         
         await db.guardarPedido(pedido);
         await sync.enviarOrdenACaja(pedido);
         
-        // Impresión de Comanda (Cocina)
         if (sync.role === 'caja') {
             const debeImprimir = !isUpdate || (isUpdate && db.config.imprimirExtras);
             if (debeImprimir) {
@@ -588,9 +578,6 @@ const router = {
             if (pedido.tipo !== 'mesa') {
                 await printer.printBill(pedido);
             }
-        } else {
-            // El mesero envía a la caja, y la caja (como servidor) debería imprimir.
-            // Si el mesero tiene conexión directa a impresora, se podría hacer aquí.
         }
 
         app.showNotification(isUpdate ? "Extras agregados" : "Orden enviada");
@@ -659,12 +646,11 @@ const router = {
         });
     },
 
-    // Mejoras en el panel de pedido para Meseros
     pedirCuentaMesa() {
         if (!this.ordenActual.id) return;
         if (confirm("¿Solicitar cuenta para esta mesa?")) {
             this.ordenActual.estado = 'cuenta_pedida';
-            this.enviarOrden(); // Re-enviar para actualizar estado
+            this.enviarOrden(); 
         }
     },
 
@@ -822,7 +808,6 @@ const router = {
         `;
         document.body.appendChild(m);
 
-        // Lógica de Slider Simple (Simulada para touch/mouse)
         const handle = m.querySelector('#slider-handle');
         const container = m.querySelector('#slider-container');
         const text = m.querySelector('#slider-text');
@@ -896,7 +881,6 @@ const router = {
 
     showHRMCard() {
         const m = document.createElement('div'); m.className = 'modal-full';
-        // Cambio: display block y overflow-y auto para permitir scroll con dedo
         m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:block; overflow-y:auto; z-index:20000; padding: 20px 0;";
         m.innerHTML = `
             <div style="background:white; padding:30px; border-radius:20px; width:90%; max-width:400px; margin: 20px auto;">
@@ -971,7 +955,6 @@ const router = {
         div.style = `position:absolute; left:${mesa.x}px; top:${mesa.y}px; width:${mesa.ancho}px; height:${mesa.alto}px; background:white; border:2px solid var(--primary); border-radius:${mesa.forma==='redonda'?'50%':'8px'}; display:flex; flex-direction:column; justify-content:center; align-items:center; font-weight:bold; cursor:move; user-select:none; box-shadow:var(--shadow); transition: transform 0.1s;`;
         div.innerHTML = `<span>#${mesa.numero}</span><span style="font-size:0.6rem; color:red;" onclick="event.stopPropagation(); router.handleDeleteMesa(${mesa.id})">ELIMINAR</span>`;
         
-        // Cambio de forma al dar click
         div.onclick = (e) => {
             if (this._isDraggingMesa) return;
             mesa.forma = mesa.forma === 'cuadrada' ? 'redonda' : (mesa.forma === 'redonda' ? 'rectangular' : 'cuadrada');
@@ -981,7 +964,6 @@ const router = {
             db.updateMesa(mesa.id, { forma: mesa.forma, ancho: mesa.ancho });
         };
 
-        // Lógica de Arrastre
         let startX, startY, initialX, initialY;
         const onStart = (e) => {
             this._isDraggingMesa = false;
@@ -1082,7 +1064,6 @@ const router = {
     },
 
     async showTicketDetail(id) {
-        // Buscar el pedido (podría estar en activos o históricos)
         let p = db.pedidosActivos.find(x => x.id === id);
         if (!p) {
             const res = await db.getPedidosPorEstado('pagado');
@@ -1119,7 +1100,7 @@ const router = {
                     TOTAL: $${p.total.toFixed(2)}
                 </div>
                 <div style="display:flex; gap:10px; margin-top:20px;">
-                    <button class="btn-primary" style="flex:1;" onclick="printer.printBill(db.pedidosActivos.find(x=>x.id===${p.id}) || ${JSON.stringify(p).replace(/"/g, '&quot;')})">REIMPRIMIR</button>
+                    <button class="btn-primary" style="flex:1;" onclick="router.printBill(db.pedidosActivos.find(x=>x.id===${p.id}) || ${JSON.stringify(p).replace(/"/g, '&quot;')})">REIMPRIMIR</button>
                     <button class="btn-secondary" style="flex:1;" onclick="document.querySelector('.modal-full').remove()">CERRAR</button>
                 </div>
             </div>
@@ -1197,7 +1178,6 @@ const router = {
         const prodList = document.getElementById('prod-list-admin');
         if (!catList || !prodList) return;
 
-        // Render Categorías
         catList.innerHTML = `
             <div class="sidebar-item ${!this._selectedAdminCat ? 'active' : ''}" onclick="router._selectedAdminCat=null; router.refreshAdminCatalog()">
                 <span>📁</span>
@@ -1212,7 +1192,6 @@ const router = {
             </div>
         `).join('');
 
-        // Render Productos
         const prods = this._selectedAdminCat ? db.productos.filter(p => p.categoria === this._selectedAdminCat) : db.productos;
         document.getElementById('current-cat-name').innerText = this._selectedAdminCat || 'Todos los Productos';
         
@@ -1281,7 +1260,6 @@ const router = {
 
     showProductCard(p = null) {
         const m = document.createElement('div'); m.className = 'modal-full'; 
-        // Cambio: display block y overflow-y auto para permitir scroll con dedo
         m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:block; overflow-y:auto; z-index:20000; padding: 20px 0;";
         m.innerHTML = `<div style="background:white; padding:30px; border-radius:20px; width:90%; max-width:400px; text-align:left; margin: 20px auto;"><h3>${p?'Editar':'Nuevo'} Producto</h3><label>Nombre:</label><input type="text" id="ed-n" value="${p?p.nombre:''}" style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #ddd;"><label>Precio:</label><input type="number" id="ed-p" value="${p?p.precio:''}" style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #ddd;"><label>Categoría:</label><select id="ed-c" style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #ddd;">${db.categorias.map(c => `<option value="${c}" ${p&&p.categoria===c?'selected':(this._selectedAdminCat===c?'selected':'')}>${c}</option>`).join('')}</select><label style="display:flex; align-items:center; gap:10px;"><input type="checkbox" id="ed-sk" ${p&&p.requiereCarne?'checked':''}> Especial (Carnes)</label><div style="display:flex; gap:10px; margin-top:25px;"><button class="btn-primary" style="flex:1;" onclick="router.handleSaveProduct(${p?p.id:'null'})">GUARDAR</button>${p?`<button class="btn-secondary" style="background:#ff4444; color:white; border:none;" onclick="router.handleDeleteProduct(${p.id})">ELIMINAR</button>`:''}</div><button class="btn-secondary" style="width:100%; margin-top:10px; border:none;" onclick="document.querySelector('.modal-full').remove()">Cerrar</button></div>`;
         document.body.appendChild(m);
