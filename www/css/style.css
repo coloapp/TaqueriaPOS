@@ -557,10 +557,110 @@ main#content {
 .device-item {
     transition: transform 0.2s;
 }
-.device-item:active {
-    transform: scale(0.95);
+/* --- Estilos Administrativos Premium --- */
+.admin-card {
+    background: white;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    border: 1px solid #f0f0f0;
+    transition: transform 0.2s, box-shadow 0.2s;
 }
-.btn-type {
-    flex: 1; padding: 10px; background: white; border: 1px solid #ddd; font-size: 0.8rem;
+.admin-card:active { transform: scale(0.98); }
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
 }
-.btn-type.active { background: var(--primary); color: white; }
+
+.stat-item {
+    background: white;
+    padding: 20px 15px;
+    border-radius: 18px;
+    text-align: center;
+    border-bottom: 4px solid #eee;
+}
+.stat-item.primary { border-color: var(--primary); }
+.stat-item.accent { border-color: var(--accent); }
+.stat-item.success { border-color: #4CAF50; }
+
+.stat-item .val {
+    display: block;
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: var(--text-dark);
+    margin-top: 5px;
+}
+.stat-item .lab {
+    font-size: 0.65rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Grids de Inventario Modernos */
+.inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 12px;
+}
+
+.meat-status-card {
+    position: relative;
+    background: white;
+    border-radius: 18px;
+    padding: 20px 10px;
+    text-align: center;
+    border: 2px solid #eee;
+    overflow: hidden;
+}
+.meat-status-card.active { border-color: var(--primary); background: #fff5f5; }
+.meat-status-card.sold-out { opacity: 0.6; filter: grayscale(0.5); }
+
+.meat-status-card .status-badge {
+    position: absolute;
+    top: 0; right: 0;
+    padding: 4px 10px;
+    font-size: 0.6rem;
+    font-weight: bold;
+    color: white;
+    border-bottom-left-radius: 10px;
+}
+.meat-status-card.active .status-badge { background: var(--primary); }
+.meat-status-card.sold-out .status-badge { background: #999; }
+
+/* Navegación Sidebar Refinada */
+.sidebar {
+    box-shadow: 10px 0 30px rgba(0,0,0,0.2);
+    border-top-right-radius: 25px;
+    border-bottom-right-radius: 25px;
+}
+.sidebar-header {
+    background: linear-gradient(135deg, var(--primary) 0%, #880e4f 100%);
+    padding: 30px 20px;
+    color: white;
+}
+.sidebar-item {
+    margin: 5px 15px;
+    border-radius: 12px;
+    padding: 15px 20px;
+    transition: all 0.2s;
+    font-weight: 600;
+}
+.sidebar-item:hover, .sidebar-item.active {
+    background: #fff0f0;
+    color: var(--primary);
+}
+.sidebar-item span:first-child {
+    font-size: 1.3rem;
+    margin-right: 15px;
+}
+
+/* Responsividad para Vistas Admin */
+@media (max-width: 768px) {
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+    .inventory-grid { grid-template-columns: repeat(2, 1fr); }
+    .admin-card { padding: 15px; }
+}

@@ -661,24 +661,33 @@ const router = {
         const logs = res.values || [];
 
         content.innerHTML = `
-            <div style="padding:15px; height:100%;" class="scrollable-y">
-                <h2 style="color:var(--primary);">Registro de Auditoría (Logs)</h2>
-                <div style="background:white; border-radius:15px; padding:10px; box-shadow:var(--shadow);">
-                    <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
-                        <thead style="background:#f5f5f5;">
-                            <tr><th style="padding:10px; text-align:left;">FECHA/HORA</th><th>USUARIO</th><th>ACCIÓN</th><th style="text-align:right;">DETALLES</th></tr>
-                        </thead>
-                        <tbody>
-                            ${logs.map(l => `
-                                <tr style="border-bottom:1px solid #eee;">
-                                    <td style="padding:10px; color:#666;">${l.fecha}<br>${l.hora}</td>
-                                    <td><b>${l.usuario}</b></td>
-                                    <td style="color:var(--primary); font-weight:bold;">${l.accion}</td>
-                                    <td style="text-align:right; max-width:150px; overflow:hidden; text-overflow:ellipsis;">${l.detalles}</td>
+            <div style="padding:20px; height:100%;" class="scrollable-y">
+                <h2 style="color:var(--primary); margin-bottom:20px; font-weight:900;">Auditoría de Sistema</h2>
+                
+                <div class="admin-card" style="padding:0; overflow:hidden;">
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+                            <thead style="background:#f8f9fa; border-bottom:2px solid #eee;">
+                                <tr>
+                                    <th style="padding:15px; text-align:left; color:#888;">FECHA/HORA</th>
+                                    <th style="padding:15px; text-align:left; color:#888;">USUARIO</th>
+                                    <th style="padding:15px; text-align:left; color:#888;">ACCIÓN</th>
+                                    <th style="padding:15px; text-align:right; color:#888;">DETALLES</th>
                                 </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                ${logs.map(l => `
+                                    <tr style="border-bottom:1px solid #f0f0f0;">
+                                        <td style="padding:15px; color:#666; line-height:1.2;">${l.fecha}<br><small>${l.hora}</small></td>
+                                        <td style="padding:15px;"><b>${l.usuario}</b></td>
+                                        <td style="padding:15px;"><span style="background:#fff0f0; color:var(--primary); padding:4px 8px; border-radius:6px; font-weight:bold; font-size:0.7rem;">${l.accion}</span></td>
+                                        <td style="padding:15px; text-align:right; max-width:200px; color:#555;">${l.detalles}</td>
+                                    </tr>
+                                `).join('')}
+                                ${logs.length === 0 ? '<tr><td colspan="4" style="padding:40px; text-align:center; color:#999;">Sin registros aún</td></tr>' : ''}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         `;
@@ -797,21 +806,22 @@ const router = {
     renderHRM() {
         const content = document.getElementById('content');
         content.innerHTML = `
-            <div style="padding:15px; height:100%; display:flex; flex-direction:column;" class="scrollable-y">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                    <h2 style="color:var(--primary); margin:0;">Personal</h2>
-                    <button class="btn-accent" onclick="router.showHRMCard()">+ NUEVO</button>
+            <div style="padding:20px; height:100%;" class="scrollable-y">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+                    <h2 style="color:var(--primary); margin:0; font-weight:900;">Equipo de Trabajo</h2>
+                    <button class="btn-accent" style="border-radius:12px; padding:10px 20px;" onclick="router.showHRMCard()">+ NUEVO</button>
                 </div>
+                
                 <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:15px;">
                     ${db.empleados.map(e => `
-                        <div style="background:white; padding:20px; border-radius:15px; box-shadow:var(--shadow); text-align:center; position:relative;">
-                            <div style="font-size:2.5rem; margin-bottom:10px;">👤</div>
+                        <div class="admin-card" style="text-align:center; padding-top:30px;">
+                            <div style="width:70px; height:70px; background:#f0f0f0; border-radius:50%; margin:0 auto 15px; display:flex; justify-content:center; align-items:center; font-size:2rem; border:3px solid #fff; box-shadow:0 5px 15px rgba(0,0,0,0.05);">👤</div>
                             <b style="font-size:1.1rem; display:block;">${e.nombre}</b>
-                            <span style="display:inline-block; padding:3px 8px; background:#eee; border-radius:5px; font-size:0.7rem; margin:5px 0;">${e.puesto.toUpperCase()}</span>
-                            <div style="color:var(--primary); font-weight:bold; margin-top:5px;">$${e.pago_dia}/día</div>
-                            <div style="margin-top:15px; display:flex; gap:5px;">
-                                <button class="btn-primary" style="flex:1; font-size:0.7rem; background:#4CAF50;" onclick="router.handleAsistencia(${e.id}, ${e.pago_dia})">✅ ASISTENCIA</button>
-                                <button class="btn-secondary" style="flex:1; font-size:0.7rem; color:red; border-color:red;" onclick="router.showAdelantoModal(${e.id})">💸 ADELANTO</button>
+                            <span style="display:inline-block; padding:4px 10px; background:#fff3e0; color:#e65100; border-radius:8px; font-size:0.65rem; font-weight:bold; margin-top:5px;">${e.puesto.toUpperCase()}</span>
+                            
+                            <div style="margin-top:20px; display:flex; flex-direction:column; gap:8px;">
+                                <button class="btn-primary" style="background:#4CAF50; border:none; padding:10px; border-radius:10px; font-size:0.75rem; font-weight:bold;" onclick="router.handleAsistencia(${e.id}, ${e.pago_dia})">✅ ASISTENCIA</button>
+                                <button class="btn-secondary" style="color:#666; border-color:#eee; padding:8px; border-radius:10px; font-size:0.75rem;" onclick="router.showAdelantoModal(${e.id})">💸 ADELANTO</button>
                             </div>
                         </div>
                     `).join('')}
@@ -1055,18 +1065,35 @@ const router = {
     renderGastos() {
         const content = document.getElementById('content');
         content.innerHTML = `
-            <div style="padding:15px; height:100%;" class="scrollable-y">
-                <h2 style="color:var(--primary); margin-bottom:15px;">Gastos y Deudas</h2>
-                <div style="background:white; padding:20px; border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:20px;">
-                    <input type="text" id="g-desc" placeholder="Concepto (Ej: Tortilla, Verdura)" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
-                    <input type="number" id="g-monto" placeholder="Monto $0.00" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
+            <div style="padding:20px; height:100%;" class="scrollable-y">
+                <h2 style="color:var(--primary); margin-bottom:20px; font-weight:900;">Gastos y Egresos</h2>
+                
+                <div class="admin-card" style="margin-bottom:25px; border-left:5px solid var(--accent);">
+                    <h4 style="margin:0 0 15px 0;">Registrar Salida de Dinero</h4>
+                    <input type="text" id="g-desc" placeholder="Concepto (Ej: Pago Coca, Tortilla)" style="width:100%; padding:12px; margin-bottom:10px; border-radius:10px; border:1px solid #ddd;">
+                    <input type="number" id="g-monto" placeholder="Monto $0.00" style="width:100%; padding:12px; margin-bottom:15px; border-radius:10px; border:1px solid #ddd; font-size:1.1rem; font-weight:bold;">
                     <div style="display:flex; gap:10px;">
-                        <button class="btn-primary" style="flex:1;" onclick="router.handleGuardarGasto('pagado')">PAGADO</button>
-                        <button class="btn-secondary" style="flex:1; border-color:red; color:red;" onclick="router.handleGuardarGasto('pendiente')">DEUDA</button>
+                        <button class="btn-primary" style="flex:1; border-radius:10px;" onclick="router.handleGuardarGasto('pagado')">💸 PAGAR AHORA</button>
+                        <button class="btn-secondary" style="flex:1; border-color:#999; color:#666; border-radius:10px;" onclick="router.handleGuardarGasto('pendiente')">📝 ANOTAR DEUDA</button>
                     </div>
                 </div>
-                <div style="background:white; border-radius:var(--radius); box-shadow:var(--shadow);">
-                    ${db.gastos.map(g => `<div style="padding:12px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;"><span><b>${g.descripcion}</b> ${g.estado==='pendiente'?'<span style="color:red;">[DEUDA]</span>':''}<br><small>${g.fecha}</small></span><div style="text-align:right;"><b style="color:${g.estado==='pendiente'?'orange':'red'};">${g.estado==='pendiente'?'':'-'}$${g.monto.toFixed(2)}</b><br>${g.estado==='pendiente'?`<button style="font-size:0.7rem; background:green; color:white; border:none; padding:4px 8px; border-radius:5px;" onclick="router.handlePagarDeuda(${g.id})">PAGAR</button>`:''}</div></div>`).join('')}
+
+                <div class="admin-card">
+                    <h4 style="margin:0 0 15px 0;">Movimientos Recientes</h4>
+                    <div style="display:grid; gap:10px;">
+                        ${db.gastos.map(g => `
+                            <div style="padding:15px; background:#f9f9f9; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <b style="font-size:0.9rem;">${g.descripcion}</b> ${g.estado==='pendiente'?'<span style="color:#e65100; font-size:0.6rem; background:#fff3e0; padding:2px 5px; border-radius:4px; margin-left:5px;">DEUDA</span>':''}
+                                    <div style="font-size:0.7rem; color:#999; margin-top:3px;">${g.fecha} • ${g.hora}</div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <b style="color:${g.estado==='pendiente'?'#ff9800':'#d32f2f'}; font-size:1.1rem;">${g.estado==='pendiente'?'':'-'}$${g.monto.toFixed(0)}</b>
+                                    ${g.estado==='pendiente'?`<br><button style="font-size:0.65rem; background:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:6px; margin-top:5px; font-weight:bold;" onclick="router.handlePagarDeuda(${g.id})">PAGAR</button>`:''}
+                                </div>
+                            </div>
+                        `).reverse().join('')}
+                    </div>
                 </div>
             </div>
         `;
@@ -1200,60 +1227,51 @@ const router = {
         }
 
         const metrics = await db.getMetricasCarnes();
-        const totalVentasCat = { Tacos: t.ventas * 0.6, Especiales: t.ventas * 0.25, Bebidas: t.ventas * 0.1, Otros: t.ventas * 0.05 };
+        const neto = (t.ventas - t.gastos);
 
         content.innerHTML = `
-            <div style="padding:15px; height:100%;" class="scrollable-y">
-                <h2 style="color:var(--primary); margin-bottom:15px;">Dashboard</h2>
+            <div style="padding:20px; height:100%;" class="scrollable-y">
+                <h2 style="color:var(--primary); margin-bottom:20px; font-weight:900;">Panel de Control</h2>
                 
-                <div style="background:white; padding:20px; border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:20px; text-align:center;">
-                    <h3 style="margin:0; color:#666;">INGRESOS HOY</h3>
-                    <div style="font-size:2.5rem; font-weight:bold; color:var(--primary);">$${t.ventas.toFixed(2)}</div>
-                    <div style="display:flex; justify-content:center; gap:20px; margin-top:10px;">
-                        <span style="color:red;">Gastos: -$${t.gastos.toFixed(2)}</span>
-                        <span style="color:green;">Neto: $${(t.ventas - t.gastos).toFixed(2)}</span>
+                <div class="stat-grid">
+                    <div class="stat-item primary">
+                        <span class="lab">Ingresos Brutos</span>
+                        <span class="val">$${t.ventas.toFixed(0)}</span>
+                    </div>
+                    <div class="stat-item accent">
+                        <span class="lab">Gastos / Pagos</span>
+                        <span class="val">$${t.gastos.toFixed(0)}</span>
+                    </div>
+                    <div class="stat-item success">
+                        <span class="lab">Utilidad Neta</span>
+                        <span class="val">$${neto.toFixed(0)}</span>
                     </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:20px;">
-                    <div style="background:white; padding:15px; border-radius:var(--radius); box-shadow:var(--shadow);">
-                        <h4>Ventas por Categoría</h4>
-                        <div style="font-size:0.8rem;">
-                            <div>🌮 Tacos: <b>$${totalVentasCat.Tacos.toFixed(0)}</b></div>
-                            <div>✨ Especiales: <b>$${totalVentasCat.Especiales.toFixed(0)}</b></div>
-                            <div>🥤 Bebidas: <b>$${totalVentasCat.Bebidas.toFixed(0)}</b></div>
-                            <div>📦 Otros: <b>$${totalVentasCat.Otros.toFixed(0)}</b></div>
-                        </div>
+                <div class="admin-card" style="margin-bottom:20px;">
+                    <h4 style="margin:0 0 15px 0;">Ventas por Categoría</h4>
+                    <div style="display:flex; height:12px; border-radius:6px; overflow:hidden; background:#eee; margin-bottom:15px;">
+                        <div style="width:60%; background:var(--primary);"></div>
+                        <div style="width:25%; background:var(--accent);"></div>
+                        <div style="width:15%; background:#4CAF50;"></div>
                     </div>
-                    <div style="background:white; padding:15px; border-radius:var(--radius); box-shadow:var(--shadow);">
-                        <h4>Balance</h4>
-                        <div style="height:100px; display:flex; align-items:flex-end; gap:10px;">
-                            <div style="flex:1; background:var(--primary); height:${(t.ventas/(t.ventas+t.gastos||1))*100}%; border-radius:5px 5px 0 0;"></div>
-                            <div style="flex:1; background:#666; height:${(t.gastos/(t.ventas+t.gastos||1))*100}%; border-radius:5px 5px 0 0;"></div>
-                        </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:0.8rem; color:#666;">
+                        <span><i style="color:var(--primary);">●</i> Tacos (60%)</span>
+                        <span><i style="color:var(--accent);">●</i> Especiales (25%)</span>
+                        <span><i style="color:#4CAF50;">●</i> Bebidas (15%)</span>
                     </div>
                 </div>
 
-                <div style="background:white; padding:20px; border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:20px;">
-                    <h4 style="margin-top:0;">📊 Rendimiento de Carnes (Tacos)</h4>
-                    <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
-                        <thead>
-                            <tr style="border-bottom:2px solid #eee; text-align:left;">
-                                <th style="padding:10px;">Carne</th>
-                                <th>Vendidos</th>
-                                <th style="text-align:right;">Ingreso</th>
+                <div class="admin-card">
+                    <h4 style="margin:0 0 15px 0;">🔥 Rendimiento de Carnes</h4>
+                    <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                        ${metrics.map(m => `
+                            <tr style="border-bottom:1px solid #f0f0f0;">
+                                <td style="padding:12px 0;"><b>${m.carne}</b></td>
+                                <td style="text-align:center;">${m.total_vendido} <small>u</small></td>
+                                <td style="text-align:right; color:var(--primary); font-weight:bold;">$${m.total_dinero.toFixed(0)}</td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            ${metrics.map(m => `
-                                <tr style="border-bottom:1px solid #eee;">
-                                    <td style="padding:12px 10px;"><b>${m.carne}</b></td>
-                                    <td>${m.total_vendido} units</td>
-                                    <td style="text-align:right; color:green; font-weight:bold;">$${m.total_dinero.toFixed(2)}</td>
-                                </tr>
-                            `).join('')}
-                            ${metrics.length === 0 ? '<tr><td colspan="3" style="text-align:center; padding:20px; color:#999;">Sin ventas aún</td></tr>' : ''}
-                        </tbody>
+                        `).join('')}
                     </table>
                 </div>
             </div>
@@ -1264,22 +1282,24 @@ const router = {
     renderAdminCarnes() {
         const content = document.getElementById('content');
         content.innerHTML = `
-            <div style="padding:15px; height:100%;" class="scrollable-y">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                    <h2 style="color:var(--primary); margin:0;">Gestión de Carnes</h2>
+            <div style="padding:20px; height:100%;" class="scrollable-y">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2 style="color:var(--primary); margin:0; font-weight:900;">Inventario de Carnes</h2>
                 </div>
-                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:15px;">
+                
+                <div class="inventory-grid">
                     ${db.carnes.map(c => `
-                        <div class="product-card" 
-                             style="height:auto; aspect-ratio:auto; padding:20px; border:2px solid ${c.disponible ? 'var(--primary)' : '#ccc'}; cursor:pointer; opacity: ${c.disponible ? '1' : '0.5'};" 
+                        <div class="meat-status-card ${c.disponible ? 'active' : 'sold-out'}" 
                              onclick="router.handleToggleCarne('${c.id}')">
-                            <div style="font-size:1.5rem; margin-bottom:10px;">${c.premium ? '⭐' : '🥩'}</div>
-                            <b>${c.nombre}</b><br>
-                            <span style="color:${c.disponible ? 'green' : 'red'}; font-weight:bold; font-size:0.8rem;">
-                                ${c.disponible ? 'DISPONIBLE' : 'AGOTADO'}
-                            </span>
+                            <div class="status-badge">${c.disponible ? '✓ HAY' : '✕ NO HAY'}</div>
+                            <div style="font-size:2.2rem; margin-bottom:10px;">${c.premium ? '⭐' : '🥩'}</div>
+                            <b style="font-size:0.9rem; text-transform:uppercase;">${c.nombre}</b>
                         </div>
                     `).join('')}
+                </div>
+                
+                <div style="margin-top:30px; padding:15px; background:#e3f2fd; border-radius:15px; color:#0d47a1; font-size:0.8rem;">
+                    💡 Toca una tarjeta para cambiar el estado. Las carnes marcadas como <b>NO HAY</b> desaparecerán del menú de los meseros instantáneamente.
                 </div>
             </div>
         `;

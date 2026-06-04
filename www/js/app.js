@@ -113,21 +113,34 @@ const app = {
 
         // El menú lateral ahora es visible para ambos roles por petición del usuario
         sidebarMenu.innerHTML = `
-            <div class="sidebar-item" onclick="router.navigate('pos')"><span>🛒</span> POS Ventas</div>
-            <div class="sidebar-item" onclick="router.navigate('mesas')"><span>📍</span> Mapa de Mesas</div>
-            <div class="sidebar-item" onclick="router.navigate('cocina')"><span>👨‍🍳</span> Monitor Cocina</div>
+            <div class="sidebar-header">
+                <div style="font-size:2rem; margin-bottom:10px;">🌮</div>
+                <h2 style="margin:0; font-size:1.2rem;">TaqueriaPOS</h2>
+                <small style="opacity:0.8;">Sistema de Gestión Offline</small>
+            </div>
             
-            <div style="margin-top:15px; padding:10px; font-size:0.7rem; color:#999; border-top:1px solid #eee; font-weight:bold;">ADMINISTRACIÓN</div>
-            <div class="sidebar-item" onclick="router.navigate('admin_dashboard')"><span>📊</span> Dashboard</div>
-            <div class="sidebar-item" onclick="router.navigate('admin_informes')"><span>📈</span> Historial Ventas</div>
-            <div class="sidebar-item" id="btn-catalogo-nav" onclick="router.navigate('admin_productos')"><span>🌮</span> Catálogo Menu</div>
-            <div class="sidebar-item" onclick="router.navigate('admin_carnes')"><span>🥩</span> Inventario Carnes</div>
-            <div class="sidebar-item" onclick="router.navigate('admin_croquis')"><span>📐</span> Editor de Mesas</div>
-            <div class="sidebar-item" onclick="router.navigate('admin_gastos')"><span>💸</span> Gastos y Egresos</div>
-            <div class="sidebar-item" onclick="router.navigate('admin_hrm')"><span>👥</span> Personal y Sueldos</div>
-            <div class="sidebar-item" onclick="router.navigate('admin_logs')"><span>📝</span> Auditoría (Logs)</div>
-            <div class="sidebar-item" id="btn-config-nav" onclick="router.navigate('config')"><span>⚙️</span> Configuración</div>
-            <div class="sidebar-item" style="color:red; margin-top:20px; border-top:1px solid #eee;" onclick="location.reload()"><span>🚪</span> Cerrar Sesión</div>
+            <div style="margin-top:20px;">
+                <div class="sidebar-item" onclick="router.navigate('pos')"><span>🛒</span> Ventas POS</div>
+                <div class="sidebar-item" onclick="router.navigate('mesas')"><span>📍</span> Mapa de Mesas</div>
+                <div class="sidebar-item" onclick="router.navigate('cocina')"><span>👨‍🍳</span> Monitor Cocina</div>
+                <div class="sidebar-item" onclick="router.navigate('caja')"><span>💰</span> Caja y Cobros</div>
+                
+                <div style="margin:25px 20px 10px; font-size:0.65rem; color:#999; letter-spacing:1.5px; font-weight:900;">ADMINISTRACIÓN</div>
+                <div class="sidebar-item" onclick="router.navigate('admin_dashboard')"><span>📊</span> Dashboard</div>
+                <div class="sidebar-item" onclick="router.navigate('admin_informes')"><span>📈</span> Historial Ventas</div>
+                <div class="sidebar-item" onclick="router.navigate('admin_productos')"><span>🌮</span> Catálogo Menú</div>
+                <div class="sidebar-item" onclick="router.navigate('admin_carnes')"><span>🥩</span> Inventario Carnes</div>
+                <div class="sidebar-item" onclick="router.navigate('admin_gastos')"><span>💸</span> Gastos y Egresos</div>
+                <div class="sidebar-item" onclick="router.navigate('admin_hrm')"><span>👥</span> Personal y Sueldos</div>
+                <div class="sidebar-item" onclick="router.navigate('admin_logs')"><span>📝</span> Auditoría (Logs)</div>
+                <div class="sidebar-item" onclick="router.navigate('config')"><span>⚙️</span> Configuración</div>
+            </div>
+
+            <div style="margin-top:40px; padding:0 15px 30px;">
+                <button class="btn-secondary" style="width:100%; border-color:#ffcdd2; color:#d32f2f; background:#fff5f5; border-radius:12px; padding:12px;" onclick="location.reload()">
+                    🚪 CERRAR SESIÓN
+                </button>
+            </div>
         `;
     }
 };
