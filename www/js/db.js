@@ -63,14 +63,14 @@ const db = {
     async createTables() {
         const schema = `
             CREATE TABLE IF NOT EXISTS categorias (id INTEGER PRIMARY KEY, nombre TEXT UNIQUE);
-            CREATE TABLE IF NOT EXISTS productos (id INTEGER PRIMARY KEY, categoria_id INTEGER, nombre TEXT, abreviatura TEXT, precio REAL, requiereCarne INTEGER, precioSencillo REAL, variantes TEXT);
+            CREATE TABLE IF NOT EXISTS productos (id INTEGER PRIMARY KEY, categoria_id INTEGER, nombre TEXT, abreviatura TEXT, precio REAL, requiereCarne INTEGER, precioSencillo REAL, variantes TEXT, agotado INTEGER DEFAULT 0, stock INTEGER DEFAULT 0);
             CREATE TABLE IF NOT EXISTS carnes (id TEXT PRIMARY KEY, nombre TEXT, abreviatura TEXT, disponible INTEGER, premium INTEGER, exclusivaTaco INTEGER);
             CREATE TABLE IF NOT EXISTS mesas (id INTEGER PRIMARY KEY, numero TEXT, x REAL, y REAL, ancho REAL, alto REAL, forma TEXT, estado TEXT);
             CREATE TABLE IF NOT EXISTS empleados (id INTEGER PRIMARY KEY, nombre TEXT, puesto TEXT, pago_dia REAL, pin TEXT);
             CREATE TABLE IF NOT EXISTS turnos (id INTEGER PRIMARY KEY, fecha TEXT, hora_inicio TEXT, hora_fin TEXT, inicioCaja REAL, ventas REAL, gastos REAL, retiros REAL, estado TEXT);
             CREATE TABLE IF NOT EXISTS gastos (id INTEGER PRIMARY KEY, descripcion TEXT, monto REAL, fecha TEXT, hora TEXT, estado TEXT);
             CREATE TABLE IF NOT EXISTS logs_auditoria (id INTEGER PRIMARY KEY, usuario TEXT, accion TEXT, detalles TEXT, fecha TEXT, hora TEXT);
-            CREATE TABLE IF NOT EXISTS pedidos (id INTEGER PRIMARY KEY, tipo TEXT, mesaId INTEGER, mesaNumero TEXT, cliente TEXT, platos TEXT, total REAL, metodo_pago TEXT, estado TEXT, fecha TEXT, fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP);
+            CREATE TABLE IF NOT EXISTS pedidos (id INTEGER PRIMARY KEY, tipo TEXT, mesaId INTEGER, mesaNumero TEXT, cliente TEXT, platos TEXT, total REAL, metodo_pago TEXT, estado TEXT, fecha TEXT, fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP, descuento REAL DEFAULT 0, fiar_a TEXT);
         `;
         await this.dbConn.execute(schema);
         const res = await this.dbConn.query("SELECT count(*) as count FROM productos");
@@ -119,7 +119,12 @@ const db = {
             this.productos = (prodRes.values || []).map(p => ({ 
                 ...p, 
                 requiereCarne: !!p.requiereCarne,
-                variantes: p.variantes ? JSON.parse(p.variantes) : {}
+                agotado: !!p.agotado,
+                stock: p.stock || 0,
+                variantes: (() => {
+                    try { return p.variantes ? JSON.parse(p.variantes) : {}; }
+                    catch(e) { return {}; }
+                })()
             }));
             const carRes = await this.dbConn.query("SELECT * FROM carnes");
             this.carnes = (carRes.values || []).map(c => ({ ...c, disponible: !!c.disponible }));
@@ -132,16 +137,22 @@ const db = {
             this.gastos = gasRes.values || [];
             const empRes = await this.dbConn.query("SELECT * FROM empleados");
             this.empleados = empRes.values || [];
-            const pedRes = await this.dbConn.query("SELECT * FROM pedidos WHERE estado != 'pagado' AND estado != 'cancelado'");
-            this.pedidosActivos = (pedRes.values || []).map(p => ({ ...p, platos: JSON.parse(p.platos), cliente: JSON.parse(p.cliente) }));
+            const pedRes = await this.dbConn.query("SELECT * FROM pedidos WHERE estado != 'pagado' AND estado != 'cancelado' AND estado != 'deuda'");
+            this.pedidosActivos = (pedRes.values || []).map(p => ({ 
+                ...p, 
+                platos: JSON.parse(p.platos), 
+                cliente: JSON.parse(p.cliente),
+                descuento: p.descuento || 0,
+                fiar_a: p.fiar_a || null
+            }));
         } catch (e) { console.error("Error Carga:", e); }
     },
 
     loadMockData() {
         this.categorias = ['Tacos', 'Especialidades', 'Bebidas'];
         this.productos = [
-            {id:1, nombre:'Taco Pastor', categoria:'Tacos', precio:18, requiereCarne:true, variantes:{}},
-            {id:7, nombre:'Quesadilla', categoria:'Especialidades', precio:35, requiereCarne:true, precioSencillo:25, variantes:{}}
+            {id:1, nombre:'Taco Pastor', categoria:'Tacos', precio:18, requiereCarne:true, agotado:false, stock:0, variantes:{}},
+            {id:7, nombre:'Quesadilla', categoria:'Especialidades', precio:35, requiereCarne:true, precioSencillo:25, agotado:false, stock:0, variantes:{}}
         ];
         this.carnes = [
             {id:'pastor', nombre:'Pastor', disponible:true, premium:false},
@@ -218,12 +229,12 @@ const db = {
             const catRes = await this.dbConn.query("SELECT id FROM categorias WHERE nombre=?", [p.categoria]);
             const catId = catRes.values[0]?.id;
             const variantesStr = JSON.stringify(p.variantes || {});
-            const res = await this.dbConn.run("INSERT INTO productos (categoria_id, nombre, abreviatura, precio, requiereCarne, precioSencillo, variantes) VALUES (?,?,?,?,?,?,?)", [catId, p.nombre, p.abreviatura || p.nombre.substring(0,5).toUpperCase(), p.precio, p.requiereCarne ? 1 : 0, p.precioSencillo || 0, variantesStr]);
+            const res = await this.dbConn.run("INSERT INTO productos (categoria_id, nombre, abreviatura, precio, requiereCarne, precioSencillo, variantes, agotado, stock) VALUES (?,?,?,?,?,?,?,?,?)", [catId, p.nombre, p.abreviatura || p.nombre.substring(0,5).toUpperCase(), p.precio, p.requiereCarne ? 1 : 0, p.precioSencillo || 0, variantesStr, p.agotado ? 1 : 0, p.stock || 0]);
             p.id = res.changes.lastId;
         } else {
             p.id = Date.now();
         }
-        const newP = { ...p, requiereCarne: !!p.requiereCarne, variantes: p.variantes || {} };
+        const newP = { ...p, requiereCarne: !!p.requiereCarne, agotado: !!p.agotado, stock: p.stock || 0, variantes: p.variantes || {} };
         this.productos.push(newP);
         return newP;
     },
@@ -233,10 +244,18 @@ const db = {
             const catRes = await this.dbConn.query("SELECT id FROM categorias WHERE nombre=?", [p.categoria]);
             const catId = catRes.values[0]?.id;
             const variantesStr = JSON.stringify(p.variantes || {});
-            await this.dbConn.run("UPDATE productos SET categoria_id=?, nombre=?, precio=?, requiereCarne=?, precioSencillo=?, variantes=? WHERE id=?", [catId, p.nombre, p.precio, p.requiereCarne ? 1 : 0, p.precioSencillo || 0, variantesStr, p.id]);
+            await this.dbConn.run("UPDATE productos SET categoria_id=?, nombre=?, precio=?, requiereCarne=?, precioSencillo=?, variantes=?, agotado=?, stock=? WHERE id=?", [catId, p.nombre, p.precio, p.requiereCarne ? 1 : 0, p.precioSencillo || 0, variantesStr, p.agotado ? 1 : 0, p.stock || 0, p.id]);
         }
         const idx = this.productos.findIndex(x => x.id === p.id);
-        if (idx !== -1) this.productos[idx] = { ...p, requiereCarne: !!p.requiereCarne, variantes: p.variantes || {} };
+        if (idx !== -1) this.productos[idx] = { ...p, requiereCarne: !!p.requiereCarne, agotado: !!p.agotado, stock: p.stock || 0, variantes: p.variantes || {} };
+    },
+
+    async toggleAgotado(id) {
+        const p = this.productos.find(x => x.id === id);
+        if (p) {
+            p.agotado = !p.agotado;
+            if (this.dbConn) await this.dbConn.run("UPDATE productos SET agotado=? WHERE id=?", [p.agotado ? 1 : 0, id]);
+        }
     },
 
     async deleteProducto(id) {
@@ -345,24 +364,27 @@ const db = {
     },
 
     async getReporteGeneral(periodo = 'hoy') {
-        if (!this.dbConn) return { ventas: 0, totalGastos: 0, lista: [] };
-        let query = "SELECT * FROM pedidos WHERE estado='pagado'";
+        if (!this.dbConn) return { ventas: 0, totalGastos: 0, totalDescuentos: 0, deudas: [], lista: [] };
+        let query = "SELECT * FROM pedidos WHERE (estado='pagado' OR estado='deuda')";
         if (periodo === 'hoy') query += " AND fecha = '" + new Date().toLocaleDateString() + "'";
         const res = await this.dbConn.query(query + " ORDER BY id DESC");
         const lista = (res.values || []).map(p => ({ ...p, platos: JSON.parse(p.platos) }));
+        
         const ventas = lista.reduce((a, b) => a + b.total, 0);
+        const totalDescuentos = lista.reduce((a, b) => a + (b.descuento || 0), 0);
+        const deudas = lista.filter(p => p.estado === 'deuda');
         
         let gQuery = "SELECT SUM(monto) as total FROM gastos WHERE estado='pagado'";
         if (periodo === 'hoy') gQuery += " AND fecha = '" + new Date().toLocaleDateString() + "'";
         const gRes = await this.dbConn.query(gQuery);
         const totalGastos = gRes.values[0].total || 0;
         
-        return { ventas, totalGastos, lista };
+        return { ventas, totalGastos, totalDescuentos, deudas, lista };
     },
 
     async getMetricasCarnes() {
         if (!this.dbConn) return [];
-        const res = await this.dbConn.query("SELECT platos, total FROM pedidos WHERE estado='pagado' AND fecha = ?", [new Date().toLocaleDateString()]);
+        const res = await this.dbConn.query("SELECT platos, total FROM pedidos WHERE (estado='pagado' OR estado='deuda') AND fecha = ?", [new Date().toLocaleDateString()]);
         const metrics = {};
         (res.values || []).forEach(p => {
             const platos = JSON.parse(p.platos);
@@ -407,9 +429,9 @@ const db = {
         if (this.dbConn) {
             const check = await this.dbConn.query("SELECT id FROM pedidos WHERE id = ?", [p.id]);
             if (check.values.length > 0) {
-                await this.dbConn.run("UPDATE pedidos SET platos=?, cliente=?, total=?, estado=? WHERE id=?", [pStr, cStr, total, p.estado, p.id]);
+                await this.dbConn.run("UPDATE pedidos SET platos=?, cliente=?, total=?, estado=?, descuento=?, fiar_a=? WHERE id=?", [pStr, cStr, total, p.estado, p.descuento || 0, p.fiar_a || null, p.id]);
             } else {
-                await this.dbConn.run("INSERT INTO pedidos (id, tipo, mesaId, mesaNumero, cliente, platos, total, estado, fecha) VALUES (?,?,?,?,?,?,?,?,?)", [p.id, p.tipo, p.mesaId, p.mesaNumero, cStr, pStr, total, p.estado, new Date().toLocaleDateString()]);
+                await this.dbConn.run("INSERT INTO pedidos (id, tipo, mesaId, mesaNumero, cliente, platos, total, estado, fecha, descuento, fiar_a) VALUES (?,?,?,?,?,?,?,?,?,?,?)", [p.id, p.tipo, p.mesaId, p.mesaNumero, cStr, pStr, total, p.estado, new Date().toLocaleDateString(), p.descuento || 0, p.fiar_a || null]);
             }
         }
         const idx = this.pedidosActivos.findIndex(x => x.id === p.id);
@@ -438,6 +460,11 @@ const db = {
                 subtotal += pBase * it.cantidad;
             });
         });
+
+        // Aplicar descuento
+        subtotal -= (p.descuento || 0);
+        if (subtotal < 0) subtotal = 0;
+
         if (conComision && this.config.comisionTarjeta > 0) {
             subtotal = subtotal * (1 + (this.config.comisionTarjeta / 100));
         }
@@ -448,7 +475,7 @@ const db = {
         if (this.dbConn) await this.dbConn.run("UPDATE pedidos SET estado=? WHERE id=?", [estado, id]);
         const p = this.pedidosActivos.find(x => x.id === id);
         if (p) p.estado = estado;
-        if (estado === 'cancelado' || estado === 'pagado') this.pedidosActivos = this.pedidosActivos.filter(x => x.id !== id);
+        if (estado === 'cancelado' || estado === 'pagado' || estado === 'deuda') this.pedidosActivos = this.pedidosActivos.filter(x => x.id !== id);
     },
 
     async addLog(accion, detalles) {
@@ -460,21 +487,23 @@ const db = {
         }
     },
 
-    async cobrarPedido(id, metodo) {
+    async cobrarPedido(id, metodo, fiarA = null) {
         const p = this.pedidosActivos.find(x => x.id === id);
         if (!p) return;
         const total = this.calcularTotal(p, metodo === 'tarjeta');
-        p.estado = 'pagado';
+        p.estado = metodo === 'fiado' ? 'deuda' : 'pagado';
         p.metodo_pago = metodo;
+        if (fiarA) p.fiar_a = fiarA;
+
         if (this.dbConn) {
-            await this.dbConn.run("UPDATE pedidos SET estado='pagado', metodo_pago=?, total=? WHERE id=?", [metodo, total, id]);
+            await this.dbConn.run("UPDATE pedidos SET estado=?, metodo_pago=?, total=?, fiar_a=? WHERE id=?", [p.estado, metodo, total, p.fiar_a || null, id]);
             if (this.turnoActual) {
                 await this.dbConn.run("UPDATE turnos SET ventas = ventas + ? WHERE id=?", [total, this.turnoActual.id]);
                 this.turnoActual.ventas += total;
             }
         }
         this.pedidosActivos = this.pedidosActivos.filter(x => x.id !== id);
-        app.showNotification("💰 VENTA REGISTRADA: $" + total.toFixed(2));
+        app.showNotification(metodo === 'fiado' ? "📝 DEUDA REGISTRADA: $" + total.toFixed(2) : "💰 VENTA REGISTRADA: $" + total.toFixed(2));
     },
 
     async abrirTurno(monto) {

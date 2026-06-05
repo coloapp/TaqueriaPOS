@@ -789,3 +789,39 @@ main#content {
     z-index: 100;
     border: 1px solid white;
 }
+
+/* Nuevos badges y estados */
+.product-card.sold-out {
+    opacity: 0.6;
+    filter: grayscale(0.5);
+    pointer-events: none;
+    position: relative;
+}
+
+.sold-out-badge {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-15deg);
+    background: rgba(211, 47, 47, 0.9);
+    color: white;
+    padding: 5px 15px;
+    font-weight: 900;
+    font-size: 0.8rem;
+    border-radius: 5px;
+    z-index: 10;
+    border: 2px solid white;
+}
+
+.badge-deuda {
+    background: var(--accent);
+    color: white;
+    font-size: 0.6rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+    margin-left: 5px;
+    vertical-align: middle;
+}
+
+.stat-item.warning { border-color: var(--accent); }

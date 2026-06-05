@@ -188,7 +188,8 @@ const router = {
         if (!grid) return;
         const prods = db.productos.filter(p => p.categoria === this.currentCategory);
         grid.innerHTML = prods.map(p => `
-            <div class="product-card" onclick="router.addToOrder(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+            <div class="product-card ${p.agotado ? 'sold-out' : ''}" onclick="${p.agotado ? '' : `router.addToOrder(${JSON.stringify(p).replace(/"/g, '&quot;')})`}">
+                ${p.agotado ? '<div class="sold-out-badge">AGOTADO</div>' : ''}
                 <div class="prod-code">${p.abreviatura || p.nombre.substring(0,3).toUpperCase()}</div>
                 <div class="prod-price">$${p.precio}</div>
                 <div class="prod-name">${p.nombre.toUpperCase()}</div>
@@ -373,12 +374,14 @@ const router = {
         const m = document.createElement('div'); m.className = 'modal-full'; m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:20000;";
         m.innerHTML = `
             <div style="background:white; padding:30px; border-radius:20px; width:90%; max-width:400px; text-align:center;">
-                <h3>Total: $${t.toFixed(2)}</h3>
+                <h3 id="pay-total-display">Total: $${t.toFixed(2)}</h3>
                 <div style="display:grid; gap:12px; margin-top:20px;">
                     <button class="btn-primary" style="background:#4CAF50;" onclick="router.handleCobro(${id}, 'efectivo')">Efectivo</button>
                     <button class="btn-primary" style="background:#2196F3;" onclick="router.handleCobro(${id}, 'transferencia')">Transferencia</button>
                     <button class="btn-primary" style="background:#9C27B0;" onclick="router.handleCobro(${id}, 'tarjeta')">Tarjeta ($${tc.toFixed(2)})</button>
+                    <button class="btn-primary" style="background:#FF9800;" onclick="router.handleCobro(${id}, 'fiado')">Fiado / Deuda</button>
                     <hr>
+                    <button class="btn-accent" style="width:100%;" onclick="router.aplicarDescuento(${id})">🎁 APLICAR DESCUENTO</button>
                     <button class="btn-secondary" style="background:#607D8B; color:white;" onclick='printer.printBill(${JSON.stringify(p).replace(/"/g, '&quot;')})'>🖨️ IMPRIMIR CUENTA</button>
                 </div>
                 <button class="btn-secondary" style="width:100%; margin-top:20px;" onclick="this.closest('.modal-full').remove()">Cancelar</button>
@@ -386,7 +389,29 @@ const router = {
         `;
         document.body.appendChild(m);
     },
-    async handleCobro(id, m) { await db.cobrarPedido(id, m); document.querySelector('.modal-full').remove(); this.renderCaja(); },
+    async aplicarDescuento(id) {
+        const monto = prompt("Monto del descuento ($):");
+        if (monto !== null) {
+            const p = db.pedidosActivos.find(x => x.id === id);
+            if (p) {
+                p.descuento = parseFloat(monto) || 0;
+                await db.guardarPedido(p);
+                const t = db.calcularTotal(p);
+                document.getElementById('pay-total-display').innerText = `Total: $${t.toFixed(2)}`;
+                app.showNotification("🎁 Descuento aplicado");
+            }
+        }
+    },
+    async handleCobro(id, m) { 
+        let fiarA = null;
+        if (m === 'fiado') {
+            fiarA = prompt("¿A quién se le fía?");
+            if (!fiarA) return;
+        }
+        await db.cobrarPedido(id, m, fiarA); 
+        document.querySelector('.modal-full').remove(); 
+        this.renderCaja(); 
+    },
 
     async cerrarCajaModal() {
         const m = document.createElement('div'); m.className = 'modal-full'; m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:20000; padding:20px;";
@@ -443,22 +468,39 @@ const router = {
                         <span class="lab">Gastos</span>
                         <span class="val">$${report.totalGastos.toFixed(2)}</span>
                     </div>
+                    <div class="stat-item warning">
+                        <span class="lab">Descuentos</span>
+                        <span class="val">-$${report.totalDescuentos.toFixed(2)}</span>
+                    </div>
                     <div class="stat-item success">
                         <span class="lab">Utilidad Neta</span>
                         <span class="val">$${(report.ventas - report.totalGastos).toFixed(2)}</span>
                     </div>
                 </div>
 
+                ${report.deudas.length > 0 ? `
+                <h3 style="color:var(--accent);">⚠️ Cuentas por Cobrar (Deudas)</h3>
+                <div style="display:grid; gap:10px; margin-bottom:20px;">
+                    ${report.deudas.map(d => `
+                        <div class="admin-card" style="border-left:5px solid var(--accent); display:flex; justify-content:space-between; align-items:center;">
+                            <div><b>${d.fiar_a || 'Sin nombre'}</b><br><small>Pedido #${d.id} - ${d.fecha}</small></div>
+                            <b style="color:var(--accent); font-size:1.2rem;">$${d.total.toFixed(2)}</b>
+                        </div>
+                    `).join('')}
+                </div>
+                ` : ''}
+
                 <h3>Listado de Ventas</h3>
                 <div style="display:grid; gap:10px;">
                     ${report.lista.map(p => `
-                        <div class="admin-card" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div class="admin-card" style="display:flex; justify-content:space-between; align-items:center; ${p.estado==='deuda'?'opacity:0.7;':''}">
                             <div>
-                                <b>#${p.id} - ${p.tipo.toUpperCase()}</b><br>
+                                <b>#${p.id} - ${p.tipo.toUpperCase()}</b> ${p.estado==='deuda'?'<span class="badge-deuda">DEUDA</span>':''}<br>
                                 <small>${p.fecha} ${p.metodo_pago.toUpperCase()}</small>
                             </div>
                             <div style="text-align:right;">
                                 <b style="font-size:1.1rem; color:var(--primary);">$${p.total.toFixed(2)}</b><br>
+                                ${p.descuento > 0 ? `<small style="color:red;">Desc: -$${p.descuento}</small><br>` : ''}
                                 <button class="btn-secondary" style="padding:2px 8px; font-size:0.7rem;" onclick='router.showPedidoDetalle(${JSON.stringify(p).replace(/'/g, "&apos;")})'>DETALLES</button>
                             </div>
                         </div>
@@ -481,7 +523,9 @@ const router = {
                     ${p.mesaNumero ? `<b>Mesa:</b> ${p.mesaNumero}<br>` : ''}
                     <b>Cliente:</b> ${p.cliente?.nombre || 'General'}<br>
                     <b>Fecha:</b> ${p.fecha}<br>
-                    <b>Pago:</b> ${p.metodo_pago.toUpperCase()}
+                    <b>Estado:</b> ${p.estado.toUpperCase()}<br>
+                    ${p.fiar_a ? `<b>Deuda de:</b> ${p.fiar_a}<br>` : ''}
+                    <b>Metodo Pago:</b> ${p.metodo_pago.toUpperCase()}
                 </div>
                 <div style="background:#f9f9f9; padding:10px; border-radius:10px; margin-bottom:15px;">
                     ${p.platos.map((pl, idx) => `
@@ -492,6 +536,7 @@ const router = {
                     `).join('')}
                 </div>
                 <div style="text-align:right; font-size:1.2rem; font-weight:bold; margin-bottom:20px;">
+                    ${p.descuento > 0 ? `<small style="color:red; font-size:0.8rem;">Descuento: -$${p.descuento}</small><br>` : ''}
                     TOTAL: $${p.total.toFixed(2)}
                 </div>
                 <div style="display:flex; gap:10px;">
@@ -544,7 +589,22 @@ const router = {
     refreshAdminCatalog(cat) {
         const pl = document.getElementById('prod-l'); if(!pl) return;
         const prods = db.productos.filter(p => p.categoria === cat);
-        pl.innerHTML = prods.map(p => `<div class="admin-card" style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;"><span><b>${p.nombre}</b><br>$${p.precio}</span><button class="btn-secondary" onclick="router.showProductCard(${JSON.stringify(p).replace(/"/g, '&quot;')})">✏️</button></div>`).join('');
+        pl.innerHTML = prods.map(p => `
+            <div class="admin-card" style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; ${p.agotado ? 'opacity:0.5; background:#eee;' : ''}">
+                <span>
+                    <b>${p.nombre}</b><br>$${p.precio} 
+                    ${p.agotado ? '<b style="color:red;">(AGOTADO)</b>' : ''}
+                </span>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-secondary" style="font-size:0.7rem;" onclick="router.handleToggleAgotado(${p.id}, '${cat}')">${p.agotado ? 'ACTIVAR' : 'AGOTAR'}</button>
+                    <button class="btn-secondary" onclick="router.showProductCard(${JSON.stringify(p).replace(/"/g, '&quot;')})">✏️</button>
+                </div>
+            </div>
+        `).join('');
+    },
+    async handleToggleAgotado(id, cat) {
+        await db.toggleAgotado(id);
+        this.refreshAdminCatalog(cat);
     },
     showProductCard(p = null) {
         const m = document.createElement('div'); m.className = 'modal-full'; m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:20000;";
