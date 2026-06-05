@@ -167,11 +167,7 @@ const router = {
         this.renderOrderPanel(); 
         this.updateQuickActionsUI();
         
-        // Layout dual para tablets/escritorio
-        if (window.innerWidth > 900) {
-            const side = document.getElementById('order-side');
-            if (side) side.classList.add('desktop-visible');
-        }
+        // El layout dual (side-by-side) se maneja ahora puramente por CSS media queries (801px+)
     },
 
     renderCategories() {
