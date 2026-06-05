@@ -34,20 +34,22 @@ const printer = {
         // Encabezado según tipo de orden
         if (pedido.tipo === 'mesa') {
             t += "MESA #" + pedido.mesaNumero + "\n";
+            t += "(" + mesero.toUpperCase() + ")\n";
         } else if (pedido.tipo === 'llevar') {
-            t += "PARA LLEVAR #" + pedido.id.toString().slice(-4) + "\n";
+            t += "LLEVAR #" + pedido.id.toString().slice(-4) + "\n";
         } else if (pedido.tipo === 'domicilio') {
             t += "DOMICILIO #" + pedido.id.toString().slice(-4) + "\n";
         }
         
         if (esExtra) t += "!!! EXTRAS !!!\n";
         
-        t += this.SIZE_NORMAL + "MESERO: " + mesero.toUpperCase() + "\n" + this.BOLD_OFF;
+        t += this.SIZE_NORMAL + this.BOLD_OFF;
         t += "FECHA: " + new Date().toLocaleTimeString() + "\n";
         
         if (pedido.tipo === 'domicilio' && pedido.cliente) {
             t += this.BOLD_ON + "-".repeat(chars) + "\n";
-            t += "DIR: " + (pedido.cliente.nombre || 'N/A') + "\n";
+            t += "CLIENTE: " + (pedido.cliente.nombre || 'N/A') + "\n";
+            t += "DIR: " + (pedido.cliente.dir || 'N/A') + "\n";
             t += "TEL: " + (pedido.cliente.tel || 'N/A') + "\n";
             t += "-".repeat(chars) + "\n" + this.BOLD_OFF;
         } else {
@@ -62,18 +64,23 @@ const printer = {
             t += this.BOLD_ON + "PLATO " + (i + 1) + "\n" + this.BOLD_OFF;
             
             plato.items.forEach(it => {
-                t += this.SIZE_LARGE + it.cantidad + " " + it.nombre.toUpperCase();
+                t += this.SIZE_LARGE + it.cantidad + "x " + it.nombre.toUpperCase();
                 if (it.carneId) t += " (" + it.carneId.toUpperCase() + ")";
                 t += this.SIZE_NORMAL + "\n";
                 if(it.conQueso) t += "  + CON QUESO\n";
             });
 
             let notasV = [];
-            if (plato.sinCebolla) notasV.push("S/ CEB");
-            if (plato.sinCilantro) notasV.push("S/ CIL");
-            if (plato.sinVerdura) notasV.push("S/ VER");
-            if (notasV.length > 0) t += this.BOLD_ON + ">> " + notasV.join(' ') + "\n" + this.BOLD_OFF;
-            if (plato.notas) t += "NOTA: " + plato.notas + "\n";
+            if (plato.sinCebolla) notasV.push("S/ CEBOLLA");
+            if (plato.sinCilantro) notasV.push("S/ CILANTRO");
+            if (plato.sinVerdura) notasV.push("S/ VERDURA");
+            
+            if (notasV.length > 0 || plato.notas) {
+                t += this.BOLD_ON;
+                if (notasV.length > 0) t += ">> " + notasV.join(' ') + "\n";
+                if (plato.notas) t += "NOTA: " + plato.notas.toUpperCase() + "\n";
+                t += this.BOLD_OFF;
+            }
 
             t += "-".repeat(chars) + "\n";
         });
@@ -91,15 +98,39 @@ const printer = {
         t += db.config.direccion + "\n";
         t += "Tel: " + db.config.telefono + "\n";
         t += this.drawLine('caja');
-        t += (pedido.tipo === 'mesa' ? "MESA #" + pedido.mesaNumero : "PEDIDO: " + pedido.tipo.toUpperCase()) + "\n";
+        
+        if (pedido.tipo === 'mesa') {
+            t += this.BOLD_ON + "VENTA MESA #" + pedido.mesaNumero + "\n" + this.BOLD_OFF;
+        } else {
+            t += this.BOLD_ON + "VENTA " + pedido.tipo.toUpperCase() + " #" + pedido.id.toString().slice(-4) + "\n" + this.BOLD_OFF;
+        }
+
+        t += "ID: " + pedido.id + "\n";
         t += "FECHA: " + new Date().toLocaleString() + "\n";
         t += this.drawLine('caja');
         t += this.LEFT;
         
         pedido.platos.forEach(pl => {
             pl.items.forEach(it => {
-                const totalItem = it.cantidad * it.precio;
-                const namePart = it.nombre.substring(0, chars - 12);
+                let pUnitario = it.precio;
+                const v = it.variantes || {};
+                
+                if (it.requiereCarne && it.carneId) {
+                    pUnitario += (parseFloat(v[it.carneId]) || 0);
+                } else if (it.requiereCarne && !it.carneId && it.precioSencillo > 0) {
+                    pUnitario = it.precioSencillo;
+                }
+                
+                if (it.conQueso) {
+                    pUnitario += (parseFloat(v['queso']) || 0);
+                }
+
+                const totalItem = it.cantidad * pUnitario;
+                let desc = it.nombre.toUpperCase();
+                if (it.carneId) desc += " " + it.carneId.toUpperCase();
+                if (it.conQueso) desc += " +Q";
+                
+                const namePart = desc.substring(0, chars - 12);
                 t += it.cantidad + " " + namePart.padEnd(chars - 12) + " $" + totalItem.toFixed(2).padStart(7) + "\n";
             });
         });
@@ -114,7 +145,7 @@ const printer = {
             t += db.config.bancoBeneficiario + "\n";
         }
 
-        t += this.CENTER + "\n¡GRACIAS POR SU VISITA!\n";
+        t += "\n" + this.CENTER + "¡GRACIAS POR SU COMPRA!\n";
         t += "\n\n\n\n" + this.GS + "V" + "\u0041" + "\u0000"; 
         return t;
     },
