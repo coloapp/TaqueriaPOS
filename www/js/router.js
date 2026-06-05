@@ -149,11 +149,6 @@ const router = {
                     </div>
                     <div class="category-carousel" id="category-carousel"></div>
                     <div class="catalog-scroll-area"><div class="products-grid" id="products-grid"></div></div>
-                    <div class="quick-actions-bar">
-                        <button class="btn-quick" id="qa-ceb" onclick="router.toggleQuickSwitch('sinCebolla')">S/ CEBOLLA</button>
-                        <button class="btn-quick" id="qa-cil" onclick="router.toggleQuickSwitch('sinCilantro')">S/ CILANTRO</button>
-                        <button class="btn-quick" id="qa-ver" onclick="router.toggleQuickSwitch('sinVerdura')">S/ VERDURA</button>
-                    </div>
                 </div>
                 <div class="order-side-panel" id="order-side"></div>
             </div>
@@ -165,7 +160,6 @@ const router = {
         this.renderCategories(); 
         this.renderProducts(); 
         this.renderOrderPanel(); 
-        this.updateQuickActionsUI();
         
         // El layout dual (side-by-side) se maneja ahora puramente por CSS media queries (801px+)
     },
@@ -196,13 +190,7 @@ const router = {
     },
 
     selectCategory(cat) { this.currentCategory = cat; this.renderCategories(); this.renderProducts(); },
-    toggleQuickSwitch(field) { const pl = this.ordenActual.platos[this.currentPlatoIdx]; pl[field] = !pl[field]; this.updateQuickActionsUI(); this.refreshOrderList(); },
-    updateQuickActionsUI() { 
-        const pl = this.ordenActual.platos[this.currentPlatoIdx]; if (!pl) return;
-        const qCeb = document.getElementById('qa-ceb'); if(qCeb) qCeb.classList.toggle('active', pl.sinCebolla);
-        const qCil = document.getElementById('qa-cil'); if(qCil) qCil.classList.toggle('active', pl.sinCilantro);
-        const qVer = document.getElementById('qa-ver'); if(qVer) qVer.classList.toggle('active', pl.sinVerdura);
-    },
+    toggleQuickSwitch(field) { const pl = this.ordenActual.platos[this.currentPlatoIdx]; pl[field] = !pl[field]; this.refreshOrderList(); },
 
     addToOrder(prod) {
         // LÓGICA DE NEGOCIO POR CATEGORÍA

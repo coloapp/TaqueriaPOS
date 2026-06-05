@@ -148,7 +148,7 @@ main#content {
         transform: none !important;
         display: flex !important;
     }
-    .floating-actions .cart {
+    .floating-actions {
         display: none !important;
     }
 }
