@@ -63,7 +63,7 @@ const db = {
     async createTables() {
         const schema = `
             CREATE TABLE IF NOT EXISTS categorias (id INTEGER PRIMARY KEY, nombre TEXT UNIQUE);
-            CREATE TABLE IF NOT EXISTS productos (id INTEGER PRIMARY KEY, categoria_id INTEGER, nombre TEXT, abreviatura TEXT, precio REAL, requiereCarne INTEGER, precioSencillo REAL);
+            CREATE TABLE IF NOT EXISTS productos (id INTEGER PRIMARY KEY, categoria_id INTEGER, nombre TEXT, abreviatura TEXT, precio REAL, requiereCarne INTEGER, precioSencillo REAL, variantes TEXT);
             CREATE TABLE IF NOT EXISTS carnes (id TEXT PRIMARY KEY, nombre TEXT, abreviatura TEXT, disponible INTEGER, premium INTEGER, exclusivaTaco INTEGER);
             CREATE TABLE IF NOT EXISTS mesas (id INTEGER PRIMARY KEY, numero TEXT, x REAL, y REAL, ancho REAL, alto REAL, forma TEXT, estado TEXT);
             CREATE TABLE IF NOT EXISTS empleados (id INTEGER PRIMARY KEY, nombre TEXT, puesto TEXT, pago_dia REAL, pin TEXT);
@@ -116,7 +116,11 @@ const db = {
             const catRes = await this.dbConn.query("SELECT * FROM categorias");
             this.categorias = (catRes.values || []).map(c => c.nombre);
             const prodRes = await this.dbConn.query("SELECT p.*, c.nombre as categoria FROM productos p LEFT JOIN categorias c ON p.categoria_id = c.id");
-            this.productos = (prodRes.values || []).map(p => ({ ...p, requiereCarne: !!p.requiereCarne }));
+            this.productos = (prodRes.values || []).map(p => ({ 
+                ...p, 
+                requiereCarne: !!p.requiereCarne,
+                variantes: p.variantes ? JSON.parse(p.variantes) : {}
+            }));
             const carRes = await this.dbConn.query("SELECT * FROM carnes");
             this.carnes = (carRes.values || []).map(c => ({ ...c, disponible: !!c.disponible }));
             const mesaRes = await this.dbConn.query("SELECT * FROM mesas");
@@ -136,8 +140,8 @@ const db = {
     loadMockData() {
         this.categorias = ['Tacos', 'Especialidades', 'Bebidas'];
         this.productos = [
-            {id:1, nombre:'Taco Pastor', categoria:'Tacos', precio:18, requiereCarne:true},
-            {id:7, nombre:'Quesadilla', categoria:'Especialidades', precio:35, requiereCarne:true, precioSencillo:25}
+            {id:1, nombre:'Taco Pastor', categoria:'Tacos', precio:18, requiereCarne:true, variantes:{}},
+            {id:7, nombre:'Quesadilla', categoria:'Especialidades', precio:35, requiereCarne:true, precioSencillo:25, variantes:{}}
         ];
         this.carnes = [
             {id:'pastor', nombre:'Pastor', disponible:true, premium:false},
@@ -213,12 +217,13 @@ const db = {
         if (this.dbConn) {
             const catRes = await this.dbConn.query("SELECT id FROM categorias WHERE nombre=?", [p.categoria]);
             const catId = catRes.values[0]?.id;
-            const res = await this.dbConn.run("INSERT INTO productos (categoria_id, nombre, abreviatura, precio, requiereCarne, precioSencillo) VALUES (?,?,?,?,?,?)", [catId, p.nombre, p.abreviatura || p.nombre.substring(0,5).toUpperCase(), p.precio, p.requiereCarne ? 1 : 0, p.precioSencillo || 0]);
+            const variantesStr = JSON.stringify(p.variantes || {});
+            const res = await this.dbConn.run("INSERT INTO productos (categoria_id, nombre, abreviatura, precio, requiereCarne, precioSencillo, variantes) VALUES (?,?,?,?,?,?,?)", [catId, p.nombre, p.abreviatura || p.nombre.substring(0,5).toUpperCase(), p.precio, p.requiereCarne ? 1 : 0, p.precioSencillo || 0, variantesStr]);
             p.id = res.changes.lastId;
         } else {
             p.id = Date.now();
         }
-        const newP = { ...p, requiereCarne: !!p.requiereCarne };
+        const newP = { ...p, requiereCarne: !!p.requiereCarne, variantes: p.variantes || {} };
         this.productos.push(newP);
         return newP;
     },
@@ -227,10 +232,11 @@ const db = {
         if (this.dbConn) {
             const catRes = await this.dbConn.query("SELECT id FROM categorias WHERE nombre=?", [p.categoria]);
             const catId = catRes.values[0]?.id;
-            await this.dbConn.run("UPDATE productos SET categoria_id=?, nombre=?, precio=?, requiereCarne=?, precioSencillo=? WHERE id=?", [catId, p.nombre, p.precio, p.requiereCarne ? 1 : 0, p.precioSencillo || 0, p.id]);
+            const variantesStr = JSON.stringify(p.variantes || {});
+            await this.dbConn.run("UPDATE productos SET categoria_id=?, nombre=?, precio=?, requiereCarne=?, precioSencillo=?, variantes=? WHERE id=?", [catId, p.nombre, p.precio, p.requiereCarne ? 1 : 0, p.precioSencillo || 0, variantesStr, p.id]);
         }
         const idx = this.productos.findIndex(x => x.id === p.id);
-        if (idx !== -1) this.productos[idx] = { ...p, requiereCarne: !!p.requiereCarne };
+        if (idx !== -1) this.productos[idx] = { ...p, requiereCarne: !!p.requiereCarne, variantes: p.variantes || {} };
     },
 
     async deleteProducto(id) {
@@ -252,7 +258,8 @@ const db = {
                 nombre: `Taco de ${c.nombre}`,
                 precio: precio,
                 categoria: catTacos,
-                requiereCarne: true
+                requiereCarne: true,
+                variantes: {}
             });
         }
     },
@@ -415,16 +422,19 @@ const db = {
         p.platos.forEach(pl => {
             pl.items.forEach(it => {
                 let pBase = it.precio;
+                const v = it.variantes || {};
+                
                 if (it.requiereCarne && it.carneId) {
-                    const carne = this.carnes.find(c => c.id === it.carneId);
-                    if (carne && carne.premium) {
-                        const extra = (it.nombre.toLowerCase().includes('taco') ? (this.config.extraTacoPremium || 7) : (this.config.extraEspecialidadPremium || 10));
-                        pBase += extra;
-                    }
+                    const extra = parseFloat(v[it.carneId]) || 0;
+                    pBase += extra;
                 } else if (it.requiereCarne && !it.carneId && it.precioSencillo > 0) {
                     pBase = it.precioSencillo;
                 }
-                if (it.conQueso) pBase += 10;
+                
+                if (it.conQueso) {
+                    pBase += (parseFloat(v['queso']) || 0);
+                }
+                
                 subtotal += pBase * it.cantidad;
             });
         });

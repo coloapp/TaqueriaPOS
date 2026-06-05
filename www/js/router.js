@@ -214,15 +214,16 @@ const router = {
         const m = document.createElement('div'); m.className = 'modal-full';
         m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:25000;";
         const isLonche = prod.nombre.toLowerCase().includes('lonche');
+        const v = prod.variantes || {};
         m.innerHTML = `
             <div style="background:white; padding:25px; border-radius:20px; width:90%; max-width:400px; text-align:center;">
                 <h3>${prod.nombre.toUpperCase()}</h3>
                 ${prod.precioSencillo > 0 ? `<button class="btn-primary" style="width:100%; margin-bottom:15px; background:#607D8B;" onclick="router._addItemToOrder(${JSON.stringify(prod).replace(/"/g, '&quot;')}, null, false)">SENCILLA ($${prod.precioSencillo})</button>` : ''}
-                ${isLonche ? `<div style="margin-bottom:15px; background:#fff3e0; padding:10px; border-radius:10px; display:flex; justify-content:space-between; align-items:center;"><b>¿CON QUESO? (+$10)</b><input type="checkbox" id="lonche-q" style="width:25px; height:25px;"></div>` : ''}
+                ${isLonche ? `<div style="margin-bottom:15px; background:#fff3e0; padding:10px; border-radius:10px; display:flex; justify-content:space-between; align-items:center;"><b>¿CON QUESO? (+$${v['queso'] || 10})</b><input type="checkbox" id="lonche-q" style="width:25px; height:25px;"></div>` : ''}
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-height:350px; overflow-y:auto;" class="scrollable-y">
                     ${db.carnes.filter(c => c.disponible).map(c => `
                         <button class="btn-secondary" style="padding:15px; font-weight:bold; position:relative;" onclick="router._addItemToOrder(${JSON.stringify(prod).replace(/"/g, '&quot;')}, '${c.id}', ${c.premium})">
-                            ${c.nombre.toUpperCase()} ${c.premium?'⭐':''}
+                            ${c.nombre.toUpperCase()} ($${(prod.precio + (v[c.id] || 0))})
                         </button>
                     `).join('')}
                 </div>
@@ -235,7 +236,7 @@ const router = {
     _addItemToOrder(prod, carneId = null, isPremium = false) {
         const plato = this.ordenActual.platos[this.currentPlatoIdx];
         const conQueso = document.getElementById('lonche-q')?.checked || false;
-        const item = { ...prod, cantidad: 1, carneId, conQueso, isPremiumMeat: isPremium };
+        const item = { ...prod, cantidad: 1, carneId, conQueso, isPremiumMeat: isPremium, variantes: prod.variantes };
         const existing = plato.items.find(i => i.id === prod.id && i.carneId === carneId && i.conQueso === conQueso);
         if (existing) existing.cantidad++; else plato.items.push(item);
         document.querySelectorAll('.modal-full').forEach(m => m.remove());
@@ -531,17 +532,55 @@ const router = {
     },
     showProductCard(p = null) {
         const m = document.createElement('div'); m.className = 'modal-full'; m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:20000;";
-        m.innerHTML = `<div style="background:white; padding:30px; border-radius:20px; width:90%; max-width:400px;"><h3>Producto</h3><label>Nombre:</label><input type="text" id="ed-n" value="${p?p.nombre:''}" style="width:100%; padding:10px;"><label>Precio c/Carne:</label><input type="number" id="ed-p" value="${p?p.precio:''}" style="width:100%; padding:10px;"><label>Precio Sencillo (0 si no aplica):</label><input type="number" id="ed-ps" value="${p?p.precioSencillo:0}" style="width:100%; padding:10px;"><label>Categoría:</label><select id="ed-c" style="width:100%; padding:10px;">${db.categorias.map(c => `<option value="${c}" ${p?.categoria===c?'selected':''}>${c}</option>`).join('')}</select><br><label><input type="checkbox" id="ed-sk" ${p?.requiereCarne?'checked':''}> Requiere Carne</label><br><br><button class="btn-primary" onclick="router.handleSaveProduct(${p?p.id:'null'})">GUARDAR</button><button class="btn-secondary" onclick="this.closest('.modal-full').remove()">X</button></div>`;
+        const v = p?.variantes || {};
+        m.innerHTML = `
+            <div style="background:white; padding:25px; border-radius:20px; width:95%; max-width:450px; max-height:90vh; overflow-y:auto;" class="scrollable-y">
+                <h3>${p?'Editar':'Nuevo'} Producto</h3>
+                <label>Nombre:</label><input type="text" id="ed-n" value="${p?p.nombre:''}" style="width:100%; padding:10px; margin-bottom:10px;">
+                <label>Precio Base (c/Carne):</label><input type="number" id="ed-p" value="${p?p.precio:''}" style="width:100%; padding:10px; margin-bottom:10px;">
+                <label>Precio Sencillo (0 si no aplica):</label><input type="number" id="ed-ps" value="${p?p.precioSencillo:0}" style="width:100%; padding:10px; margin-bottom:10px;">
+                <label>Categoría:</label><select id="ed-c" style="width:100%; padding:10px; margin-bottom:10px;">${db.categorias.map(c => `<option value="${c}" ${p?.categoria===c?'selected':''}>${c}</option>`).join('')}</select>
+                <label style="display:flex; align-items:center; gap:10px; font-weight:bold; margin-bottom:15px;"><input type="checkbox" id="ed-sk" ${p?.requiereCarne?'checked':''} onchange="document.getElementById('ed-variants-area').style.display = this.checked ? 'block' : 'none'"> REQUIERE CARNE</label>
+                
+                <div id="ed-variants-area" style="display:${p?.requiereCarne?'block':'none'}; background:#f9f9f9; padding:15px; border-radius:10px; margin-bottom:20px;">
+                    <h4 style="margin-bottom:10px; border-bottom:1px solid #ddd;">Extras por Variante</h4>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        ${db.carnes.map(c => `
+                            <div style="font-size:0.8rem;">
+                                <label>${c.nombre} (+ $):</label>
+                                <input type="number" class="ed-var-meat" data-id="${c.id}" value="${v[c.id] || 0}" style="width:100%; padding:5px;">
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div style="margin-top:15px;">
+                        <label><b>Extra Queso (+ $):</b></label>
+                        <input type="number" id="ed-var-queso" value="${v['queso'] || 0}" style="width:100%; padding:8px;">
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-primary" style="flex:1;" onclick="router.handleSaveProduct(${p?p.id:'null'})">GUARDAR</button>
+                    <button class="btn-secondary" style="flex:1;" onclick="this.closest('.modal-full').remove()">CANCELAR</button>
+                </div>
+            </div>
+        `;
         document.body.appendChild(m);
     },
     async handleSaveProduct(id) { 
+        const variantes = {};
+        document.querySelectorAll('.ed-var-meat').forEach(input => {
+            variantes[input.dataset.id] = parseFloat(input.value) || 0;
+        });
+        variantes['queso'] = parseFloat(document.getElementById('ed-var-queso').value) || 0;
+
         const pr = { 
             id, 
             nombre: document.getElementById('ed-n').value, 
             precio: parseFloat(document.getElementById('ed-p').value), 
             precioSencillo: parseFloat(document.getElementById('ed-ps').value) || 0,
             categoria: document.getElementById('ed-c').value, 
-            requiereCarne: document.getElementById('ed-sk').checked 
+            requiereCarne: document.getElementById('ed-sk').checked,
+            variantes: variantes
         }; 
         if(id) await db.updateProducto(pr); else await db.addProducto(pr); 
         this.renderCatalogo(); 
