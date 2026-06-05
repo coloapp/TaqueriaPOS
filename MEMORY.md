@@ -21,43 +21,27 @@ Sistema de punto de venta (POS) offline para una taquería. Gestión de ventas, 
 - **Otros:** Quesadillas, lonches, volcanes, papa rellena.
 - **Bebidas:** Aguas (Jamaica/Horchata 1L/0.5L), Refrescos (Coca 0.5L).
 
-## Estado del Proyecto: DESARROLLO ACTIVO (Sincronización Git)
-- [x] Repositorio Git configurado y vinculado a GitHub (Privado).
-- [x] Respaldo de Memoria (MEMORY.md incluido en Git).
-- [x] Flujo de trabajo automatizado: Commit y Push después de cada cambio validado.
-- [x] Seguridad: Dual PIN (Admin/Staff) activo y funcional.
-- [x] Robustez: Cola de sincronización offline operativa.
-- [x] Precios: Sistema flexible de "Extras Premium" configurable en Ajustes.
-- [x] Catálogo: Rediseño total con gestión CRUD de categorías y productos.
-- [x] UI/UX: Restauración de Constructor de Mesas (Croquis) y área de Personal (HRM).
-- [x] Analíticas: Métricas de rendimiento por tipo de carne en Dashboard.
+## Estado del Proyecto: FASE PROTOTIPO FINALIZADA
+- [x] Arquitectura de Sincronización Local (ZeroConf Discovery + HTTP Server).
+- [x] UI Premium con Vanilla CSS (Implementado en `style.css` y `router.js`).
+- [x] Lógica de Impresión Profesional ESC/POS (PDF Virtual + Native Sharing).
+- [x] Seguridad por PIN y Autorización de Dispositivos (Implementado).
+- [x] Persistencia de Datos Offline (SQLite con `@capacitor-community/sqlite`).
+- [x] Gestión de Agotados, Fiado y Descuentos (Implementado).
 
-## Análisis Técnico (Actualización 30/05/2026)
-- **Control de Versiones:** Se utiliza un enfoque de "Continuous Sync" para evitar pérdida de datos, especialmente ante el próximo formateo de la máquina del usuario.
-- **Instrucciones:** `GEMINI.md` contiene ahora el mandato de sincronización automática.
-- **Respaldo:** El repositorio privado en GitHub sirve como "nube" para el proyecto y la memoria del agente.
+## Análisis Técnico (Agente - 05/06/2026)
+- **Frontend:** SPA con Vanilla JS. Navegación basada en templates en strings.
+- **Persistencia:** `db.js` usa SQLite nativo. Se implementó `saveToStore()` para asegurar persistencia en Android.
+- **Comunicación:** `sync.js` maneja el rol de Caja (Servidor) y Mesero (Cliente). Usa ZeroConf para auto-descubrimiento.
+- **Impresión:** `printer.js` genera tickets ESC/POS y PDF para compartir vía WhatsApp.
 
-## Próximos Pasos Identificados
-1. **QR Dinámico:** Generar el QR de pago basado en los datos bancarios de la configuración.
-2. **Impresión Física:** Validar los comandos ESC/POS con impresoras térmicas Bluetooth reales.
-3. **Refactorización:** Mover los componentes UI a archivos externos para mayor limpieza.
+## Pendientes Críticos
+1. **Refinamiento de Sincronización:** Asegurar estabilidad del servidor HTTP en segundo plano en Android.
+2. **Pruebas de Impresión Física:** Validar con impresoras Bluetooth reales (comprobar comandos ESC/POS).
+3. **Optimización de UI:** Posible migración de templates a archivos externos si el tamaño de `router.js` sigue creciendo.
+4. **Seguridad:** Implementar niveles de acceso más granulares si el cliente lo requiere.
 
-## Log de Cambios (Automático)
-- [29/05/2026 15:30:00] APK Generado con éxito. (Fase 1)
-- [29/05/2026 17:00:00] APK Generado con éxito. (Fase 2: Seguridad y Catálogo)
-- [29/05/2026 17:40:00] APK Generado con éxito. (Fase Final: Precios Flexibles y Restauración UI)
-- [29/05/2026 17:55:59.52] APK Generado con exito. 
-- [29/05/2026 18:08:21.62] APK Generado con exito. 
-- [29/05/2026 18:24:53.89] APK Generado con exito. 
-- [29/05/2026 18:33:16.12] APK Generado con exito. 
-- [30/05/2026 15:33:26.45] APK Generado con exito. 
-- [04/06/2026  1:03:45.52] APK Generado con exito. 
-- [04/06/2026 11:36:38.04] APK Generado con exito. 
-- [04/06/2026 11:45:30.97] APK Generado con exito. 
-- [04/06/2026 12:08:43.14] APK Generado con exito. 
-- [04/06/2026 12:52:18.54] APK Generado con exito. 
-- [04/06/2026 16:16:08.42] APK Generado con exito. 
-- [04/06/2026 16:33:22.59] APK Generado con exito. 
-- [04/06/2026 16:54:25.77] APK Generado con exito. 
-- [04/06/2026 18:16:58.28] APK Generado con exito. 
-- [05/06/2026  4:03:50.62] APK Generado con exito. 
+## Log de Cambios Recientes
+- [05/06/2026] Implementación de funciones de Agotado, Fiado y Descuentos.
+- [05/06/2026] Corrección crítica de persistencia SQLite agregando `saveToStore()`.
+- [05/06/2026] Actualización de esquema SQL para coincidir con la lógica de negocio actual.

@@ -51,6 +51,7 @@ const db = {
                 await this.dbConn.open();
                 await this.createTables();
                 await this.loadFromDb();
+                if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
             } catch (e) {
                 console.error("Error SQLite:", e);
                 this.loadMockData();
@@ -75,6 +76,7 @@ const db = {
         await this.dbConn.execute(schema);
         const res = await this.dbConn.query("SELECT count(*) as count FROM productos");
         if (res.values[0].count === 0) await this.seedData();
+        if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
     },
 
     async seedData() {
@@ -109,6 +111,7 @@ const db = {
             (3, '3', 250, 50, 'libre', 70, 70, 'redonda');
         `;
         await this.dbConn.execute(seed);
+        if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
     },
 
     async loadFromDb() {
@@ -145,6 +148,7 @@ const db = {
                 descuento: p.descuento || 0,
                 fiar_a: p.fiar_a || null
             }));
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         } catch (e) { console.error("Error Carga:", e); }
     },
 
@@ -164,6 +168,7 @@ const db = {
 
     async save() {
         localStorage.setItem('tpos_config', JSON.stringify(this.config));
+        if (this.dbConn && typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
     },
 
     async verificarActivacion(codigo) {
@@ -181,6 +186,7 @@ const db = {
             const res = await this.dbConn.run("INSERT INTO empleados (nombre, puesto, pago_dia, pin) VALUES (?, ?, ?, ?)", [n, p, pd, pin]);
             const e = { id: res.changes.lastId, nombre: n, puesto: p, pago_dia: pd, pin };
             this.empleados.push(e);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
             return e;
         } else {
             const e = { id: Date.now(), nombre: n, puesto: p, pago_dia: pd, pin };
@@ -192,18 +198,25 @@ const db = {
     async updateEmpleado(id, n, p, pd, pin) {
         if (this.dbConn) {
             await this.dbConn.run("UPDATE empleados SET nombre=?, puesto=?, pago_dia=?, pin=? WHERE id=?", [n, p, pd, pin, id]);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
         const idx = this.empleados.findIndex(e => e.id === id);
         if (idx !== -1) this.empleados[idx] = { id, nombre: n, puesto: p, pago_dia: pd, pin };
     },
 
     async deleteEmpleado(id) {
-        if (this.dbConn) await this.dbConn.run("DELETE FROM empleados WHERE id=?", [id]);
+        if (this.dbConn) {
+            await this.dbConn.run("DELETE FROM empleados WHERE id=?", [id]);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
+        }
         this.empleados = this.empleados.filter(e => e.id !== id);
     },
 
     async addCategoria(n) {
-        if (this.dbConn) await this.dbConn.run("INSERT INTO categorias (nombre) VALUES (?)", [n]);
+        if (this.dbConn) {
+            await this.dbConn.run("INSERT INTO categorias (nombre) VALUES (?)", [n]);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
+        }
         if (!this.categorias.includes(n)) this.categorias.push(n);
     },
 
@@ -213,6 +226,7 @@ const db = {
             const catRes = await this.dbConn.query("SELECT id FROM categorias WHERE nombre=?", [newN]);
             const catId = catRes.values[0]?.id;
             await this.dbConn.run("UPDATE productos SET categoria_id=? WHERE categoria_id=(SELECT id FROM categorias WHERE nombre=?)", [catId, oldN]);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
         const idx = this.categorias.indexOf(oldN);
         if (idx !== -1) this.categorias[idx] = newN;
@@ -220,7 +234,10 @@ const db = {
     },
 
     async deleteCategoria(n) {
-        if (this.dbConn) await this.dbConn.run("DELETE FROM categorias WHERE nombre=?", [n]);
+        if (this.dbConn) {
+            await this.dbConn.run("DELETE FROM categorias WHERE nombre=?", [n]);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
+        }
         this.categorias = this.categorias.filter(c => c !== n);
     },
 
@@ -231,6 +248,7 @@ const db = {
             const variantesStr = JSON.stringify(p.variantes || {});
             const res = await this.dbConn.run("INSERT INTO productos (categoria_id, nombre, abreviatura, precio, requiereCarne, precioSencillo, variantes, agotado, stock) VALUES (?,?,?,?,?,?,?,?,?)", [catId, p.nombre, p.abreviatura || p.nombre.substring(0,5).toUpperCase(), p.precio, p.requiereCarne ? 1 : 0, p.precioSencillo || 0, variantesStr, p.agotado ? 1 : 0, p.stock || 0]);
             p.id = res.changes.lastId;
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         } else {
             p.id = Date.now();
         }
@@ -245,6 +263,7 @@ const db = {
             const catId = catRes.values[0]?.id;
             const variantesStr = JSON.stringify(p.variantes || {});
             await this.dbConn.run("UPDATE productos SET categoria_id=?, nombre=?, precio=?, requiereCarne=?, precioSencillo=?, variantes=?, agotado=?, stock=? WHERE id=?", [catId, p.nombre, p.precio, p.requiereCarne ? 1 : 0, p.precioSencillo || 0, variantesStr, p.agotado ? 1 : 0, p.stock || 0, p.id]);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
         const idx = this.productos.findIndex(x => x.id === p.id);
         if (idx !== -1) this.productos[idx] = { ...p, requiereCarne: !!p.requiereCarne, agotado: !!p.agotado, stock: p.stock || 0, variantes: p.variantes || {} };
@@ -254,18 +273,25 @@ const db = {
         const p = this.productos.find(x => x.id === id);
         if (p) {
             p.agotado = !p.agotado;
-            if (this.dbConn) await this.dbConn.run("UPDATE productos SET agotado=? WHERE id=?", [p.agotado ? 1 : 0, id]);
+            if (this.dbConn) {
+                await this.dbConn.run("UPDATE productos SET agotado=? WHERE id=?", [p.agotado ? 1 : 0, id]);
+                if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
+            }
         }
     },
 
     async deleteProducto(id) {
-        if (this.dbConn) await this.dbConn.run("DELETE FROM productos WHERE id=?", [id]);
+        if (this.dbConn) {
+            await this.dbConn.run("DELETE FROM productos WHERE id=?", [id]);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
+        }
         this.productos = this.productos.filter(p => p.id !== id);
     },
 
     async addCarne(c) {
         if (this.dbConn) {
             await this.dbConn.run("INSERT INTO carnes (id, nombre, abreviatura, disponible, premium) VALUES (?,?,?,?,?)", [c.id, c.nombre, c.id.substring(0,3).toUpperCase(), 1, c.premium ? 1 : 0]);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
         this.carnes.push({ id: c.id, nombre: c.nombre, disponible: true, premium: !!c.premium });
         
@@ -286,13 +312,17 @@ const db = {
     async updateCarne(c) {
         if (this.dbConn) {
             await this.dbConn.run("UPDATE carnes SET nombre=?, premium=? WHERE id=?", [c.nombre, c.premium ? 1 : 0, c.id]);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
         const idx = this.carnes.findIndex(x => x.id === c.id);
         if (idx !== -1) this.carnes[idx] = { ...this.carnes[idx], ...c };
     },
 
     async deleteCarne(id) {
-        if (this.dbConn) await this.dbConn.run("DELETE FROM carnes WHERE id=?", [id]);
+        if (this.dbConn) {
+            await this.dbConn.run("DELETE FROM carnes WHERE id=?", [id]);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
+        }
         this.carnes = this.carnes.filter(c => c.id !== id);
     },
 
@@ -300,7 +330,10 @@ const db = {
         const c = this.carnes.find(x => x.id === id);
         if (c) {
             c.disponible = !c.disponible;
-            if (this.dbConn) await this.dbConn.run("UPDATE carnes SET disponible=? WHERE id=?", [c.disponible ? 1 : 0, id]);
+            if (this.dbConn) {
+                await this.dbConn.run("UPDATE carnes SET disponible=? WHERE id=?", [c.disponible ? 1 : 0, id]);
+                if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
+            }
         }
     },
 
@@ -314,6 +347,7 @@ const db = {
                 await this.dbConn.run("UPDATE turnos SET gastos = gastos + ? WHERE id=?", [g.monto, this.turnoActual.id]);
                 this.turnoActual.gastos += g.monto;
             }
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         } else {
             g.id = Date.now();
         }
@@ -332,6 +366,7 @@ const db = {
                     await this.dbConn.run("UPDATE turnos SET gastos = gastos + ? WHERE id=?", [g.monto, this.turnoActual.id]);
                     this.turnoActual.gastos += g.monto;
                 }
+                if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
             }
         }
     },
@@ -341,6 +376,7 @@ const db = {
         const newMesa = { id, numero: (this.mesas.length + 1).toString(), x: 50, y: 50, ancho: 70, alto: 70, forma: m.forma, estado: 'libre' };
         if (this.dbConn) {
             await this.dbConn.run("INSERT INTO mesas (id, numero, x, y, ancho, alto, forma, estado) VALUES (?,?,?,?,?,?,?,?)", [newMesa.id, newMesa.numero, newMesa.x, newMesa.y, newMesa.ancho, newMesa.alto, newMesa.forma, newMesa.estado]);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
         this.mesas.push(newMesa);
         return newMesa;
@@ -354,12 +390,16 @@ const db = {
                 const sets = Object.keys(data).map(k => `${k}=?`).join(', ');
                 const vals = [...Object.values(data), id];
                 await this.dbConn.run(`UPDATE mesas SET ${sets} WHERE id=?`, vals);
+                if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
             }
         }
     },
 
     async eliminarMesa(id) {
-        if (this.dbConn) await this.dbConn.run("DELETE FROM mesas WHERE id=?", [id]);
+        if (this.dbConn) {
+            await this.dbConn.run("DELETE FROM mesas WHERE id=?", [id]);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
+        }
         this.mesas = this.mesas.filter(m => m.id !== id);
     },
 
@@ -433,6 +473,7 @@ const db = {
             } else {
                 await this.dbConn.run("INSERT INTO pedidos (id, tipo, mesaId, mesaNumero, cliente, platos, total, estado, fecha, descuento, fiar_a) VALUES (?,?,?,?,?,?,?,?,?,?,?)", [p.id, p.tipo, p.mesaId, p.mesaNumero, cStr, pStr, total, p.estado, new Date().toLocaleDateString(), p.descuento || 0, p.fiar_a || null]);
             }
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
         const idx = this.pedidosActivos.findIndex(x => x.id === p.id);
         if (idx === -1) this.pedidosActivos.push({ ...p, total });
@@ -472,7 +513,10 @@ const db = {
     },
 
     async updatePedidoEstado(id, estado) {
-        if (this.dbConn) await this.dbConn.run("UPDATE pedidos SET estado=? WHERE id=?", [estado, id]);
+        if (this.dbConn) {
+            await this.dbConn.run("UPDATE pedidos SET estado=? WHERE id=?", [estado, id]);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
+        }
         const p = this.pedidosActivos.find(x => x.id === id);
         if (p) p.estado = estado;
         if (estado === 'cancelado' || estado === 'pagado' || estado === 'deuda') this.pedidosActivos = this.pedidosActivos.filter(x => x.id !== id);
@@ -484,6 +528,7 @@ const db = {
             const h = new Date().toLocaleTimeString();
             const u = router.currentUser ? router.currentUser.nombre : 'SISTEMA';
             await this.dbConn.run("INSERT INTO logs_auditoria (usuario, accion, detalles, fecha, hora) VALUES (?,?,?,?,?)", [u, accion, detalles, f, h]);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
     },
 
@@ -501,6 +546,7 @@ const db = {
                 await this.dbConn.run("UPDATE turnos SET ventas = ventas + ? WHERE id=?", [total, this.turnoActual.id]);
                 this.turnoActual.ventas += total;
             }
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
         this.pedidosActivos = this.pedidosActivos.filter(x => x.id !== id);
         app.showNotification(metodo === 'fiado' ? "📝 DEUDA REGISTRADA: $" + total.toFixed(2) : "💰 VENTA REGISTRADA: $" + total.toFixed(2));
@@ -513,6 +559,7 @@ const db = {
         if (this.dbConn) {
             const res = await this.dbConn.run("INSERT INTO turnos (fecha, hora_inicio, inicioCaja, ventas, gastos, retiros, estado) VALUES (?,?,?,?,?,?,?)", [f, h, m, 0, 0, 0, 'abierto']);
             this.turnoActual = { id: res.changes.lastId, fecha: f, hora_inicio: h, inicioCaja: m, ventas: 0, gastos: 0, retiros: 0, estado: 'abierto' };
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         } else {
             this.turnoActual = { id: Date.now(), fecha: f, hora_inicio: h, inicioCaja: m, ventas: 0, gastos: 0, retiros: 0, estado: 'abierto' };
         }
@@ -526,6 +573,7 @@ const db = {
         if (this.dbConn) {
             await this.dbConn.run("UPDATE turnos SET estado='cerrado', hora_fin=? WHERE id=?", [h, this.turnoActual.id]);
             await this.addLog('CORTE', `Caja Final: ${mR}, Esperado: ${this.turnoActual.inicioCaja + this.turnoActual.ventas - this.turnoActual.gastos - this.turnoActual.retiros}`);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
         this.turnoActual = null;
     },
@@ -536,6 +584,7 @@ const db = {
             await this.dbConn.run("UPDATE turnos SET retiros = retiros + ? WHERE id=?", [m, this.turnoActual.id]);
             this.turnoActual.retiros += m;
             await this.addLog('RETIRO', `Monto: ${m}, Motivo: ${desc}`);
+            if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
     },
 
@@ -554,6 +603,7 @@ const db = {
             if (this.dbConn) {
                 await this.dbConn.execute("PRAGMA integrity_check;");
                 await this.addLog('SISTEMA', 'Conexión a BD reparada manualmente');
+                if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
                 return true;
             }
             return false;
