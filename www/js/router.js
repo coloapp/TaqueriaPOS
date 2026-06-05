@@ -644,6 +644,7 @@ const router = {
         document.body.appendChild(m);
     },
     async handleSaveProduct(id) { 
+        const current = id ? db.productos.find(x => x.id === id) : null;
         const variantes = {};
         document.querySelectorAll('.ed-var-meat').forEach(input => {
             variantes[input.dataset.id] = parseFloat(input.value) || 0;
@@ -657,7 +658,9 @@ const router = {
             precioSencillo: parseFloat(document.getElementById('ed-ps').value) || 0,
             categoria: document.getElementById('ed-c').value, 
             requiereCarne: document.getElementById('ed-sk').checked,
-            variantes: variantes
+            variantes: variantes,
+            agotado: current ? current.agotado : false,
+            stock: current ? current.stock : 0
         }; 
         if(id) await db.updateProducto(pr); else await db.addProducto(pr); 
         this.renderCatalogo(); 
