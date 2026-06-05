@@ -382,7 +382,17 @@ const router = {
     updateTotal() { const t = db.calcularTotal({ ...this.ordenActual, cliente: this.cliente }); document.getElementById('order-total').innerText = `Total: $${t.toFixed(2)}`; },
     selectPlato(idx) { this.currentPlatoIdx = idx; document.querySelectorAll('.plato-card').forEach((c, i) => c.classList.toggle('active', i === idx)); this.updateQuickActionsUI(); },
     updatePlatoNota(idx, val) { this.ordenActual.platos[idx].notas = val; },
-    nuevoPlato() { this.ordenActual.platos.push({ items: [], sinCebolla: false, sinCilantro: false, sinVerdura: false, notas: '' }); this.currentPlatoIdx = this.ordenActual.platos.length-1; this.renderOrderPanel(); },
+    nuevoPlato() { 
+        this.ordenActual.platos.push({ items: [], sinCebolla: false, sinCilantro: false, sinVerdura: false, notas: '' }); 
+        this.currentPlatoIdx = this.ordenActual.platos.length-1; 
+        this.renderOrderPanel(); 
+        
+        // Auto-scroll al final de la lista para que el nuevo plato sea visible
+        setTimeout(() => {
+            const list = document.getElementById('platos-lista');
+            if (list) list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' });
+        }, 100);
+    },
     eliminarItem(idx) { this.ordenActual.platos[this.currentPlatoIdx].items.splice(idx, 1); this.refreshOrderList(); },
     eliminarPlatoEspecifico(idx) { if(this.ordenActual.platos.length > 1) { this.ordenActual.platos.splice(idx, 1); if(this.currentPlatoIdx >= this.ordenActual.platos.length) this.currentPlatoIdx = 0; this.renderOrderPanel(); } },
     toggleSwitch(idx, f) { this.ordenActual.platos[idx][f] = !this.ordenActual.platos[idx][f]; this.refreshOrderList(); },
