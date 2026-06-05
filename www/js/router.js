@@ -69,15 +69,17 @@ const router = {
         const m = document.createElement('div');
         m.className = 'modal-full';
         m.id = 'pin-modal';
-        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); display:flex; justify-content:center; align-items:center; z-index:30000;";
+        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:30000;";
         m.innerHTML = `
-            <div style="background:white; padding:30px; border-radius:20px; width:90%; max-width:320px; text-align:center;">
+            <div class="pin-modal-card">
                 <div style="font-size:3rem; margin-bottom:10px;">🔒</div>
-                <h3 style="margin-bottom:20px;">PIN DE SEGURIDAD</h3>
-                <input type="password" id="pin-input" readonly style="width:100%; padding:15px; font-size:2rem; text-align:center; border:2px solid #ddd; border-radius:10px; margin-bottom:20px; letter-spacing:10px;">
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;" id="numpad">
-                    ${[1,2,3,4,5,6,7,8,9,'C',0].map(n => `<button class="btn-secondary" style="padding:15px; font-size:1.2rem; font-weight:bold; border-radius:10px;" onclick="router._handlePinKey('${n}', '${level}')">${n}</button>`).join('')}
-                    <button class="btn-secondary" style="padding:15px; font-size:0.8rem; font-weight:bold; border-radius:10px; color:red;" onclick="document.getElementById('pin-modal').remove()">CANCELAR</button>
+                <h3 style="margin-bottom:20px; letter-spacing:1px;">PIN REQUERIDO</h3>
+                <input type="password" id="pin-input" readonly class="pin-display" placeholder="••••">
+                <div class="numpad-grid" id="numpad">
+                    ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="btn-numpad" onclick="router._handlePinKey('${n}', '${level}')">${n}</button>`).join('')}
+                    <button class="btn-numpad clear" onclick="router._handlePinKey('C', '${level}')">C</button>
+                    <button class="btn-numpad" onclick="router._handlePinKey('0', '${level}')">0</button>
+                    <button class="btn-numpad cancel" onclick="document.getElementById('pin-modal').remove()">ESC</button>
                 </div>
             </div>
         `;
@@ -207,8 +209,17 @@ const router = {
     },
 
     addToOrder(prod) {
-        if (prod.requiereCarne) this.showMeatSelector(prod);
-        else this._addItemToOrder(prod);
+        // LÓGICA DE NEGOCIO POR CATEGORÍA
+        if (prod.categoria === 'Tacos') {
+            // Tacos son de cajón: Se agrega directo sin preguntar carne (ya viene en el nombre/id)
+            this._addItemToOrder(prod);
+        } else if (prod.categoria === 'Especialidades') {
+            this.showMeatSelector(prod);
+        } else if (prod.categoria === 'Ordenes') {
+            this.showMultipleMeatSelector(prod);
+        } else {
+            this._addItemToOrder(prod);
+        }
     },
 
     showMeatSelector(prod) {
@@ -216,22 +227,109 @@ const router = {
         m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:25000;";
         const isLonche = prod.nombre.toLowerCase().includes('lonche');
         const v = prod.variantes || {};
+        
         m.innerHTML = `
-            <div style="background:white; padding:25px; border-radius:20px; width:90%; max-width:400px; text-align:center;">
-                <h3>${prod.nombre.toUpperCase()}</h3>
-                ${prod.precioSencillo > 0 ? `<button class="btn-primary" style="width:100%; margin-bottom:15px; background:#607D8B;" onclick="router._addItemToOrder(${JSON.stringify(prod).replace(/"/g, '&quot;')}, null, false)">SENCILLA ($${prod.precioSencillo})</button>` : ''}
-                ${isLonche ? `<div style="margin-bottom:15px; background:#fff3e0; padding:10px; border-radius:10px; display:flex; justify-content:space-between; align-items:center;"><b>¿CON QUESO? (+$${v['queso'] || 10})</b><input type="checkbox" id="lonche-q" style="width:25px; height:25px;"></div>` : ''}
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-height:350px; overflow-y:auto;" class="scrollable-y">
-                    ${db.carnes.filter(c => c.disponible).map(c => `
-                        <button class="btn-secondary" style="padding:15px; font-weight:bold; position:relative;" onclick="router._addItemToOrder(${JSON.stringify(prod).replace(/"/g, '&quot;')}, '${c.id}', ${c.premium})">
-                            ${c.nombre.toUpperCase()} ($${(prod.precio + (v[c.id] || 0))})
-                        </button>
-                    `).join('')}
+            <div style="background:white; padding:25px; border-radius:20px; width:95%; max-width:450px; text-align:center;">
+                <h2 style="margin-bottom:5px;">${prod.nombre.toUpperCase()}</h2>
+                <p style="color:#666; margin-bottom:20px;">Elige la carne o sencilla</p>
+                
+                ${prod.precioSencillo > 0 ? `
+                    <button class="btn-primary" style="width:100%; padding:18px; margin-bottom:15px; background:#455a64; font-size:1.1rem;" 
+                            onclick="router._addItemToOrder(${JSON.stringify(prod).replace(/"/g, '&quot;')}, null, false)">
+                        SENCILLA ($${prod.precioSencillo})
+                    </button>
+                ` : ''}
+
+                ${isLonche ? `
+                    <div style="margin-bottom:15px; background:#fff3e0; padding:12px; border-radius:12px; display:flex; justify-content:space-between; align-items:center; border:1px solid #ffe0b2;">
+                        <span style="font-weight:bold;">🧀 EXTRA QUESO (+$${v['queso'] || 10})</span>
+                        <input type="checkbox" id="lonche-q" style="width:30px; height:30px;">
+                    </div>
+                ` : ''}
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-height:350px; overflow-y:auto; padding:5px;" class="scrollable-y">
+                    ${db.carnes.filter(c => c.disponible).map(c => {
+                        const extra = parseFloat(v[c.id]) || 0;
+                        const finalPrice = prod.precio + extra;
+                        return `
+                            <button class="btn-secondary" style="padding:15px; font-weight:bold; height:70px; display:flex; flex-direction:column; justify-content:center;" 
+                                    onclick="router._addItemToOrder(${JSON.stringify(prod).replace(/"/g, '&quot;')}, '${c.id}', ${c.premium})">
+                                <span>${c.nombre.toUpperCase()}</span>
+                                <small style="color:var(--primary);">$${finalPrice}</small>
+                            </button>
+                        `;
+                    }).join('')}
                 </div>
-                <button class="btn-secondary" style="width:100%; margin-top:20px;" onclick="this.closest('.modal-full').remove()">CANCELAR</button>
+                
+                <button class="btn-secondary" style="width:100%; margin-top:20px; border:none; color:#888;" onclick="this.closest('.modal-full').remove()">CANCELAR</button>
             </div>
         `;
         document.body.appendChild(m);
+    },
+
+    showMultipleMeatSelector(prod) {
+        const m = document.createElement('div'); m.className = 'modal-full';
+        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:25000;";
+        
+        const isGrande = prod.nombre.toLowerCase().includes('grande');
+        const limit = isGrande ? 4 : 3; 
+        this._selectedOrdenMeats = [];
+        
+        m.innerHTML = `
+            <div style="background:white; padding:25px; border-radius:20px; width:95%; max-width:480px; text-align:center;">
+                <h2>${prod.nombre.toUpperCase()}</h2>
+                <p>Selecciona hasta ${limit} carnes</p>
+                <div id="selected-list" style="background:#f5f5f5; padding:10px; border-radius:10px; min-height:40px; margin-bottom:15px; font-weight:bold; color:var(--primary);">Ninguna seleccionada</div>
+                
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; max-height:300px; overflow-y:auto;" class="scrollable-y">
+                    ${db.carnes.filter(c => c.disponible).map(c => `
+                        <button class="btn-secondary meat-opt" data-id="${c.id}" data-premium="${c.premium}" style="padding:10px; font-size:0.8rem;" 
+                                onclick="router._toggleMeatSelection(this, '${c.nombre}', ${limit})">
+                            ${c.nombre.toUpperCase()}
+                        </button>
+                    `).join('')}
+                </div>
+
+                <div style="margin-top:20px; display:flex; gap:10px;">
+                    <button class="btn-primary" style="flex:1; padding:15px;" onclick="router._addOrdenToOrder(${JSON.stringify(prod).replace(/"/g, '&quot;')})">AGREGAR ORDEN</button>
+                    <button class="btn-secondary" style="flex:1; padding:15px;" onclick="this.closest('.modal-full').remove()">CANCELAR</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(m);
+    },
+
+    _selectedOrdenMeats: [],
+    _toggleMeatSelection(btn, nombre, limit) {
+        const id = btn.dataset.id;
+        const idx = this._selectedOrdenMeats.findIndex(m => m.id === id);
+        
+        if (idx !== -1) {
+            this._selectedOrdenMeats.splice(idx, 1);
+            btn.classList.remove('active');
+            btn.style.background = "white"; btn.style.color = "black";
+        } else {
+            if (this._selectedOrdenMeats.length >= limit) {
+                app.showNotification(`⚠️ Máximo ${limit} carnes`);
+                return;
+            }
+            this._selectedOrdenMeats.push({ id, nombre, premium: btn.dataset.premium === 'true' });
+            btn.classList.add('active');
+            btn.style.background = "var(--primary)"; btn.style.color = "white";
+        }
+        
+        const list = document.getElementById('selected-list');
+        list.innerText = this._selectedOrdenMeats.length > 0 ? this._selectedOrdenMeats.map(m => m.nombre).join(' + ') : 'Ninguna seleccionada';
+    },
+
+    _addOrdenToOrder(prod) {
+        if (this._selectedOrdenMeats.length === 0) return app.showNotification("⚠️ Elige al menos una carne");
+        
+        const hasPremium = this._selectedOrdenMeats.some(m => m.premium);
+        const nameMeats = this._selectedOrdenMeats.map(m => m.nombre.substring(0,3).toUpperCase()).join('/');
+        
+        this._addItemToOrder(prod, nameMeats, hasPremium);
+        this._selectedOrdenMeats = [];
     },
 
     _addItemToOrder(prod, carneId = null, isPremium = false) {
@@ -241,7 +339,8 @@ const router = {
         const existing = plato.items.find(i => i.id === prod.id && i.carneId === carneId && i.conQueso === conQueso);
         if (existing) existing.cantidad++; else plato.items.push(item);
         document.querySelectorAll('.modal-full').forEach(m => m.remove());
-        this.refreshOrderList(); this.updateQuickActionsUI();
+        this.refreshOrderList(); 
+        this.updateQuickActionsUI();
         app.showNotification(`+ ${prod.nombre}`);
     },
 
@@ -589,55 +688,101 @@ const router = {
     refreshAdminCatalog(cat) {
         const pl = document.getElementById('prod-l'); if(!pl) return;
         const prods = db.productos.filter(p => p.categoria === cat);
-        pl.innerHTML = prods.map(p => `
-            <div class="admin-card" style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; ${p.agotado ? 'opacity:0.5; background:#eee;' : ''}">
-                <span>
-                    <b>${p.nombre}</b><br>$${p.precio} 
-                    ${p.agotado ? '<b style="color:red;">(AGOTADO)</b>' : ''}
-                </span>
-                <div style="display:flex; gap:10px;">
-                    <button class="btn-secondary" style="font-size:0.7rem;" onclick="router.handleToggleAgotado(${p.id}, '${cat}')">${p.agotado ? 'ACTIVAR' : 'AGOTAR'}</button>
-                    <button class="btn-secondary" onclick="router.showProductCard(${JSON.stringify(p).replace(/"/g, '&quot;')})">✏️</button>
-                </div>
+        pl.innerHTML = `
+            <div class="inventory-grid" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
+                ${prods.map(p => `
+                    <div class="admin-card product-item-card" style="padding:15px; display:flex; flex-direction:column; justify-content:space-between; ${p.agotado ? 'opacity:0.5;' : ''}">
+                        <div style="display:flex; justify-content:space-between; align-items:start;">
+                            <div style="font-size:0.7rem; color:#888;">#${p.id}</div>
+                            <div style="position:relative;">
+                                <span style="cursor:pointer; font-size:1.2rem; padding:0 5px;" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">⋮</span>
+                                <div style="display:none; position:absolute; right:0; top:20px; background:white; box-shadow:var(--shadow); border-radius:8px; z-index:100; min-width:120px;">
+                                    <div style="padding:12px; cursor:pointer; border-bottom:1px solid #eee;" onclick="router.showProductCard(${JSON.stringify(p).replace(/"/g, '&quot;')})">✏️ Editar</div>
+                                    <div style="padding:12px; cursor:pointer; color:red;" onclick="router.handleDeleteProduct(${p.id}, '${cat}')">🗑️ Eliminar</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="text-align:center; margin:15px 0;">
+                            <div style="font-size:1rem; font-weight:bold; height:40px; overflow:hidden;">${p.nombre.toUpperCase()}</div>
+                            <div style="color:var(--primary); font-weight:900; font-size:1.4rem; margin:10px 0;">$${p.precio}</div>
+                            ${p.precioSencillo > 0 ? `<div style="font-size:0.7rem; color:#666;">Sencilla: $${p.precioSencillo}</div>` : ''}
+                        </div>
+                        <button class="btn-secondary" style="width:100%; font-size:0.75rem; padding:10px; border-radius:10px;" onclick="router.handleToggleAgotado(${p.id}, '${cat}')">
+                            ${p.agotado ? '✅ REACTIVAR' : '🚫 AGOTAR'}
+                        </button>
+                    </div>
+                `).join('')}
             </div>
-        `).join('');
+        `;
     },
     async handleToggleAgotado(id, cat) {
         await db.toggleAgotado(id);
         this.refreshAdminCatalog(cat);
     },
     showProductCard(p = null) {
-        const m = document.createElement('div'); m.className = 'modal-full'; m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:20000;";
+        const m = document.createElement('div'); m.className = 'modal-full'; 
+        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:20000;";
         const v = p?.variantes || {};
+        const isTaco = p?.categoria === 'Tacos';
+        
         m.innerHTML = `
-            <div style="background:white; padding:25px; border-radius:20px; width:95%; max-width:450px; max-height:90vh; overflow-y:auto;" class="scrollable-y">
-                <h3>${p?'Editar':'Nuevo'} Producto</h3>
-                <label>Nombre:</label><input type="text" id="ed-n" value="${p?p.nombre:''}" style="width:100%; padding:10px; margin-bottom:10px;">
-                <label>Precio Base (c/Carne):</label><input type="number" id="ed-p" value="${p?p.precio:''}" style="width:100%; padding:10px; margin-bottom:10px;">
-                <label>Precio Sencillo (0 si no aplica):</label><input type="number" id="ed-ps" value="${p?p.precioSencillo:0}" style="width:100%; padding:10px; margin-bottom:10px;">
-                <label>Categoría:</label><select id="ed-c" style="width:100%; padding:10px; margin-bottom:10px;">${db.categorias.map(c => `<option value="${c}" ${p?.categoria===c?'selected':''}>${c}</option>`).join('')}</select>
-                <label style="display:flex; align-items:center; gap:10px; font-weight:bold; margin-bottom:15px;"><input type="checkbox" id="ed-sk" ${p?.requiereCarne?'checked':''} onchange="document.getElementById('ed-variants-area').style.display = this.checked ? 'block' : 'none'"> REQUIERE CARNE</label>
+            <div style="background:white; padding:25px; border-radius:25px; width:95%; max-width:450px; max-height:95vh; overflow-y:auto;" class="scrollable-y">
+                <h2 style="margin-bottom:20px; text-align:center;">${p?'EDITAR':'NUEVO'} PRODUCTO</h2>
                 
-                <div id="ed-variants-area" style="display:${p?.requiereCarne?'block':'none'}; background:#f9f9f9; padding:15px; border-radius:10px; margin-bottom:20px;">
-                    <h4 style="margin-bottom:10px; border-bottom:1px solid #ddd;">Extras por Variante</h4>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                        ${db.carnes.map(c => `
-                            <div style="font-size:0.8rem;">
-                                <label>${c.nombre} (+ $):</label>
-                                <input type="number" class="ed-var-meat" data-id="${c.id}" value="${v[c.id] || 0}" style="width:100%; padding:5px;">
+                <div style="display:grid; gap:15px; text-align:left; margin-bottom:20px;">
+                    <div>
+                        <label style="font-size:0.7rem; font-weight:bold; color:#888;">NOMBRE:</label>
+                        <input type="text" id="ed-n" value="${p?p.nombre:''}" style="width:100%; padding:15px; border-radius:12px; border:1px solid #ddd;">
+                    </div>
+                    
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                        <div>
+                            <label style="font-size:0.7rem; font-weight:bold; color:#888;">PRECIO BASE:</label>
+                            <input type="number" id="ed-p" value="${p?p.precio:''}" style="width:100%; padding:15px; border-radius:12px; border:1px solid #ddd;">
+                        </div>
+                        <div>
+                            <label style="font-size:0.7rem; font-weight:bold; color:#888;">P. SENCILLO:</label>
+                            <input type="number" id="ed-ps" value="${p?p.precioSencillo||0:0}" style="width:100%; padding:15px; border-radius:12px; border:1px solid #ddd;" ${isTaco?'disabled':''}>
+                        </div>
+                    </div>
+
+                    ${!isTaco ? `
+                    <div>
+                        <label style="font-size:0.7rem; font-weight:bold; color:#888;">CATEGORÍA:</label>
+                        <select id="ed-c" style="width:100%; padding:15px; border-radius:12px; border:1px solid #ddd; background:white;">
+                            ${db.categorias.map(c => `<option value="${c}" ${p?.categoria===c?'selected':''}>${c}</option>`).join('')}
+                        </select>
+                    </div>
+                    ` : `<input type="hidden" id="ed-c" value="Tacos">`}
+
+                    <label style="display:flex; align-items:center; gap:12px; font-weight:bold; color:var(--primary); cursor:pointer; padding:10px 0;">
+                        <input type="checkbox" id="ed-sk" ${p?.requiereCarne?'checked':''} ${isTaco?'disabled':''} 
+                               style="width:22px; height:22px;"
+                               onchange="document.getElementById('ed-variants-area').style.display = this.checked ? 'block' : 'none'"> 
+                        REQUERIR SELECCIÓN DE CARNE
+                    </label>
+                </div>
+
+                <div id="ed-variants-area" style="display:${p?.requiereCarne?'block':'none'}; background:#f8f9fa; padding:20px; border-radius:18px; margin-bottom:20px; border:1px solid #eee;">
+                    <h4 style="margin:0 0 15px; font-size:0.8rem; letter-spacing:1px; color:#555; border-bottom:1px solid #ddd; padding-bottom:8px;">COSTOS EXTRA POR CARNE PREMIUM</h4>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                        ${db.carnes.filter(c => c.premium).map(c => `
+                            <div>
+                                <label style="font-size:0.6rem; font-weight:bold; display:block; margin-bottom:4px;">${c.nombre}:</label>
+                                <input type="number" class="ed-var-meat" data-id="${c.id}" value="${v[c.id] || 0}" placeholder="+ 0" style="width:100%; padding:10px; border-radius:10px; border:1px solid #ddd;">
                             </div>
                         `).join('')}
                     </div>
-                    ${p?.nombre.toLowerCase().includes('lonche') ? `
-                    <div style="margin-top:15px;">
-                        <label><b>Extra Queso (+ $):</b></label>
-                        <input type="number" id="ed-var-queso" value="${v['queso'] || 0}" style="width:100%; padding:8px;">
+                    ${p?.nombre.toLowerCase().includes('lonche') || p?.categoria === 'Especialidades' ? `
+                    <div style="margin-top:20px; border-top:2px dashed #ddd; padding-top:15px;">
+                        <label style="font-size:0.65rem; font-weight:bold; display:block; margin-bottom:4px;">🧀 EXTRA QUESO (+$):</label>
+                        <input type="number" id="ed-var-queso" value="${v['queso'] || 0}" style="width:100%; padding:12px; border-radius:10px; border:1px solid #ddd;">
                     </div>` : '<input type="hidden" id="ed-var-queso" value="0">'}
                 </div>
 
-                <div style="display:flex; gap:10px;">
-                    <button class="btn-primary" style="flex:1;" onclick="router.handleSaveProduct(${p?p.id:'null'})">GUARDAR</button>
-                    <button class="btn-secondary" style="flex:1;" onclick="this.closest('.modal-full').remove()">CANCELAR</button>
+                <div style="display:flex; gap:12px;">
+                    <button class="btn-primary" style="flex:1.5; padding:18px; font-weight:900;" onclick="router.handleSaveProduct(${p?p.id:'null'})">GUARDAR</button>
+                    <button class="btn-secondary" style="flex:1; padding:18px; background:#f4f4f4; color:#666; border:none;" onclick="this.closest('.modal-full').remove()">CANCELAR</button>
                 </div>
             </div>
         `;

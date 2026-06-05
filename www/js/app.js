@@ -11,7 +11,6 @@ const app = {
         const emergencyTimeout = setTimeout(() => {
             console.error("⚠️ Timeout de inicialización excedido. Forzando inicio...");
             this.hideSplash();
-            this.startUI(localStorage.getItem('tpos_role') || 'caja');
         }, 6000);
 
         try {
@@ -27,7 +26,6 @@ const app = {
             console.error("❌ Error crítico en init:", e);
             clearTimeout(emergencyTimeout);
             this.hideSplash();
-            this.startUI(localStorage.getItem('tpos_role') || 'caja');
         }
     },
 
@@ -39,10 +37,9 @@ const app = {
             splash.classList.remove('active');
             splash.classList.add('hidden');
             splash.style.display = 'none';
-            // Después de ocultar splash, asegurar que startUI se llame si no se ha llamado
-            if (document.getElementById('app').classList.contains('hidden')) {
-                this.startUI(localStorage.getItem('tpos_role') || 'caja');
-            }
+            // Al ocultar splash, si no hay rol, el sistema de sync ya muestra la pantalla de setup.
+            // Si hay rol, iniciamos UI.
+            if (sync.role) this.startUI(sync.role);
         }, 600);
     },
 

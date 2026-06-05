@@ -101,6 +101,8 @@ const db = {
             (9, 2, 'Lonche', 'LON', 45, 1, 35),
             (10, 2, 'Volcan', 'VOL', 35, 1, 25),
             (11, 2, 'Papa Rellena', 'PAPA', 75, 1, 60),
+            (15, 3, 'Orden Chica', 'O_CHI', 160, 1, 0),
+            (16, 3, 'Orden Grande', 'O_GRA', 220, 1, 0),
             (20, 4, 'Refresco 500ml', 'REF', 25, 0, 0),
             (21, 4, 'Agua 1L', 'AGU', 35, 0, 0),
             (22, 4, 'Agua 0.5L', 'AGU5', 20, 0, 0);
@@ -295,18 +297,16 @@ const db = {
         }
         this.carnes.push({ id: c.id, nombre: c.nombre, disponible: true, premium: !!c.premium });
         
-        // Auto-crear Tacos
-        const catTacos = this.categorias.find(cat => cat.toLowerCase().includes('taco'));
-        if (catTacos) {
-            const precio = c.premium ? 25 : 18;
-            await this.addProducto({
-                nombre: `Taco de ${c.nombre}`,
-                precio: precio,
-                categoria: catTacos,
-                requiereCarne: true,
-                variantes: {}
-            });
-        }
+        // Auto-crear Taco de esta carne en categoría Tacos
+        const precio = c.premium ? 25 : 18;
+        await this.addProducto({
+            nombre: `Taco de ${c.nombre}`,
+            precio: precio,
+            categoria: 'Tacos',
+            requiereCarne: false, // Tacos de carne fija no requieren selector
+            abreviatura: 'T_' + c.id.substring(0,3).toUpperCase(),
+            variantes: {}
+        });
     },
 
     async updateCarne(c) {
@@ -487,11 +487,18 @@ const db = {
                 let pBase = it.precio;
                 const v = it.variantes || {};
                 
-                if (it.requiereCarne && it.carneId) {
-                    const extra = parseFloat(v[it.carneId]) || 0;
-                    pBase += extra;
-                } else if (it.requiereCarne && !it.carneId && it.precioSencillo > 0) {
-                    pBase = it.precioSencillo;
+                if (it.categoria === 'Ordenes') {
+                    // Lógica para Ordenes: Base + 30 si lleva premium
+                    if (it.isPremiumMeat) pBase += 30;
+                } else if (it.categoria === 'Especialidades') {
+                    if (it.carneId) {
+                        const extra = parseFloat(v[it.carneId]) || 0;
+                        pBase += extra;
+                    } else if (it.precioSencillo > 0) {
+                        pBase = it.precioSencillo;
+                    }
+                } else if (it.categoria === 'Tacos') {
+                    // Tacos ya traen su precio final por producto
                 }
                 
                 if (it.conQueso) {
