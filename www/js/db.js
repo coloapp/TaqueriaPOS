@@ -17,14 +17,15 @@ const db = {
     logs: [],
 
     config: {
-        nombreTaqueria: 'Mi Taquería',
-        direccion: '',
-        telefono: '',
+        nombreTaqueria: 'EL PASTORCITO',
+        direccion: 'Calle Principal #123',
+        telefono: '555-0123',
         ticketWidth: '58mm',
         ticketWidth_Cocina: '58mm',
         comisionTarjeta: 0,
-        extraTacoPremium: 6,
-        extraOrdenPremium: 30,
+        extraTacoPremium: 7, // 18 + 7 = 25
+        extraEspecialidadPremium: 10,
+        extraCarneEspecialidad: 10, // Sencilla 25 -> Con carne 35
         imprimirExtras: true,
         bluetoothMAC: '', 
         bluetoothMAC_Cocina: '',
@@ -62,7 +63,7 @@ const db = {
     async createTables() {
         const schema = `
             CREATE TABLE IF NOT EXISTS categorias (id INTEGER PRIMARY KEY, nombre TEXT UNIQUE);
-            CREATE TABLE IF NOT EXISTS productos (id INTEGER PRIMARY KEY, categoria_id INTEGER, nombre TEXT, abreviatura TEXT, precio REAL, requiereCarne INTEGER);
+            CREATE TABLE IF NOT EXISTS productos (id INTEGER PRIMARY KEY, categoria_id INTEGER, nombre TEXT, abreviatura TEXT, precio REAL, requiereCarne INTEGER, precioSencillo REAL);
             CREATE TABLE IF NOT EXISTS carnes (id TEXT PRIMARY KEY, nombre TEXT, abreviatura TEXT, disponible INTEGER, premium INTEGER, exclusivaTaco INTEGER);
             CREATE TABLE IF NOT EXISTS mesas (id INTEGER PRIMARY KEY, numero TEXT, x REAL, y REAL, ancho REAL, alto REAL, forma TEXT, estado TEXT);
             CREATE TABLE IF NOT EXISTS empleados (id INTEGER PRIMARY KEY, nombre TEXT, puesto TEXT, pago_dia REAL, pin TEXT);
@@ -78,11 +79,34 @@ const db = {
 
     async seedData() {
         const seed = `
-            INSERT INTO categorias (id, nombre) VALUES (1, 'Tacos'), (2, 'Especiales'), (3, 'Ordenes'), (4, 'Bebidas');
-            INSERT INTO productos (id, categoria_id, nombre, abreviatura, precio, requiereCarne) VALUES 
-            (1, 1, 'Pastor', 'PAS', 19, 0), (2, 1, 'Suadero', 'SUA', 19, 0), (7, 2, 'Quesadilla', 'QUESA', 45, 1);
-            INSERT INTO carnes (id, nombre, abreviatura, disponible, premium) VALUES ('pastor', 'Pastor', 'PAS', 1, 0), ('suadero', 'Suadero', 'SUA', 1, 0);
-            INSERT INTO mesas (id, numero, x, y, estado) VALUES (1, '1', 50, 100, 'libre');
+            INSERT INTO categorias (id, nombre) VALUES (1, 'Tacos'), (2, 'Especialidades'), (3, 'Ordenes'), (4, 'Bebidas');
+            
+            INSERT INTO carnes (id, nombre, abreviatura, disponible, premium) VALUES 
+            ('pastor', 'Pastor', 'PAS', 1, 0), ('suadero', 'Suadero', 'SUA', 1, 0), 
+            ('cabeza', 'Cabeza', 'CAB', 1, 0), ('carnaza', 'Carnaza', 'CAR', 1, 0),
+            ('ojo', 'Ojo', 'OJO', 1, 0), ('bistec', 'Bistec', 'BIS', 1, 0), 
+            ('chorizo', 'Chorizo', 'CHO', 1, 0),
+            ('arrachera', 'Arrachera', 'ARR', 1, 1), ('labio', 'Labio', 'LAB', 1, 1),
+            ('lengua', 'Lengua', 'LEN', 1, 1), ('sesos', 'Sesos', 'SES', 1, 1),
+            ('tripa', 'Tripa', 'TRI', 1, 1);
+
+            INSERT INTO productos (id, categoria_id, nombre, abreviatura, precio, requiereCarne, precioSencillo) VALUES 
+            (1, 1, 'Taco Pastor', 'T_PAS', 18, 1, 0),
+            (2, 1, 'Taco Suadero', 'T_SUA', 18, 1, 0),
+            (3, 1, 'Taco Bistec', 'T_BIS', 18, 1, 0),
+            (7, 2, 'Quesadilla', 'QUESA', 35, 1, 25),
+            (8, 2, 'Gringa', 'GRI', 45, 1, 35),
+            (9, 2, 'Lonche', 'LON', 45, 1, 35),
+            (10, 2, 'Volcan', 'VOL', 35, 1, 25),
+            (11, 2, 'Papa Rellena', 'PAPA', 75, 1, 60),
+            (20, 4, 'Refresco 500ml', 'REF', 25, 0, 0),
+            (21, 4, 'Agua 1L', 'AGU', 35, 0, 0),
+            (22, 4, 'Agua 0.5L', 'AGU5', 20, 0, 0);
+
+            INSERT INTO mesas (id, numero, x, y, estado, ancho, alto, forma) VALUES 
+            (1, '1', 50, 50, 'libre', 70, 70, 'cuadrada'),
+            (2, '2', 150, 50, 'libre', 70, 70, 'cuadrada'),
+            (3, '3', 250, 50, 'libre', 70, 70, 'redonda');
         `;
         await this.dbConn.execute(seed);
     },
@@ -110,9 +134,15 @@ const db = {
     },
 
     loadMockData() {
-        this.categorias = ['Tacos', 'Especiales'];
-        this.productos = [{id:1, nombre:'Pastor', categoria:'Tacos', precio:19, requiereCarne:false}];
-        this.carnes = [{id:'pastor', nombre:'Pastor', disponible:true}];
+        this.categorias = ['Tacos', 'Especialidades', 'Bebidas'];
+        this.productos = [
+            {id:1, nombre:'Taco Pastor', categoria:'Tacos', precio:18, requiereCarne:true},
+            {id:7, nombre:'Quesadilla', categoria:'Especialidades', precio:35, requiereCarne:true, precioSencillo:25}
+        ];
+        this.carnes = [
+            {id:'pastor', nombre:'Pastor', disponible:true, premium:false},
+            {id:'arrachera', nombre:'Arrachera', disponible:true, premium:true}
+        ];
         this.mesas = [{id:1, numero:'1', x:50, y:50, ancho:70, alto:70, forma:'cuadrada'}];
         this.pedidosActivos = [];
     },
@@ -122,7 +152,6 @@ const db = {
     },
 
     async verificarActivacion(codigo) {
-        // Lógica: código es el deviceId al revés
         const reverseId = this.config.deviceId.split('').reverse().join('');
         if (codigo === reverseId) {
             this.config.activado = true;
@@ -145,9 +174,222 @@ const db = {
         }
     },
 
+    async updateEmpleado(id, n, p, pd, pin) {
+        if (this.dbConn) {
+            await this.dbConn.run("UPDATE empleados SET nombre=?, puesto=?, pago_dia=?, pin=? WHERE id=?", [n, p, pd, pin, id]);
+        }
+        const idx = this.empleados.findIndex(e => e.id === id);
+        if (idx !== -1) this.empleados[idx] = { id, nombre: n, puesto: p, pago_dia: pd, pin };
+    },
+
+    async deleteEmpleado(id) {
+        if (this.dbConn) await this.dbConn.run("DELETE FROM empleados WHERE id=?", [id]);
+        this.empleados = this.empleados.filter(e => e.id !== id);
+    },
+
+    async addCategoria(n) {
+        if (this.dbConn) await this.dbConn.run("INSERT INTO categorias (nombre) VALUES (?)", [n]);
+        if (!this.categorias.includes(n)) this.categorias.push(n);
+    },
+
+    async updateCategoria(oldN, newN) {
+        if (this.dbConn) {
+            await this.dbConn.run("UPDATE categorias SET nombre=? WHERE nombre=?", [newN, oldN]);
+            const catRes = await this.dbConn.query("SELECT id FROM categorias WHERE nombre=?", [newN]);
+            const catId = catRes.values[0]?.id;
+            await this.dbConn.run("UPDATE productos SET categoria_id=? WHERE categoria_id=(SELECT id FROM categorias WHERE nombre=?)", [catId, oldN]);
+        }
+        const idx = this.categorias.indexOf(oldN);
+        if (idx !== -1) this.categorias[idx] = newN;
+        this.productos.forEach(p => { if (p.categoria === oldN) p.categoria = newN; });
+    },
+
+    async deleteCategoria(n) {
+        if (this.dbConn) await this.dbConn.run("DELETE FROM categorias WHERE nombre=?", [n]);
+        this.categorias = this.categorias.filter(c => c !== n);
+    },
+
+    async addProducto(p) {
+        if (this.dbConn) {
+            const catRes = await this.dbConn.query("SELECT id FROM categorias WHERE nombre=?", [p.categoria]);
+            const catId = catRes.values[0]?.id;
+            const res = await this.dbConn.run("INSERT INTO productos (categoria_id, nombre, abreviatura, precio, requiereCarne, precioSencillo) VALUES (?,?,?,?,?,?)", [catId, p.nombre, p.abreviatura || p.nombre.substring(0,5).toUpperCase(), p.precio, p.requiereCarne ? 1 : 0, p.precioSencillo || 0]);
+            p.id = res.changes.lastId;
+        } else {
+            p.id = Date.now();
+        }
+        const newP = { ...p, requiereCarne: !!p.requiereCarne };
+        this.productos.push(newP);
+        return newP;
+    },
+
+    async updateProducto(p) {
+        if (this.dbConn) {
+            const catRes = await this.dbConn.query("SELECT id FROM categorias WHERE nombre=?", [p.categoria]);
+            const catId = catRes.values[0]?.id;
+            await this.dbConn.run("UPDATE productos SET categoria_id=?, nombre=?, precio=?, requiereCarne=?, precioSencillo=? WHERE id=?", [catId, p.nombre, p.precio, p.requiereCarne ? 1 : 0, p.precioSencillo || 0, p.id]);
+        }
+        const idx = this.productos.findIndex(x => x.id === p.id);
+        if (idx !== -1) this.productos[idx] = { ...p, requiereCarne: !!p.requiereCarne };
+    },
+
+    async deleteProducto(id) {
+        if (this.dbConn) await this.dbConn.run("DELETE FROM productos WHERE id=?", [id]);
+        this.productos = this.productos.filter(p => p.id !== id);
+    },
+
+    async addCarne(c) {
+        if (this.dbConn) {
+            await this.dbConn.run("INSERT INTO carnes (id, nombre, abreviatura, disponible, premium) VALUES (?,?,?,?,?)", [c.id, c.nombre, c.id.substring(0,3).toUpperCase(), 1, c.premium ? 1 : 0]);
+        }
+        this.carnes.push({ id: c.id, nombre: c.nombre, disponible: true, premium: !!c.premium });
+        
+        // Auto-crear Tacos
+        const catTacos = this.categorias.find(cat => cat.toLowerCase().includes('taco'));
+        if (catTacos) {
+            const precio = c.premium ? 25 : 18;
+            await this.addProducto({
+                nombre: `Taco de ${c.nombre}`,
+                precio: precio,
+                categoria: catTacos,
+                requiereCarne: true
+            });
+        }
+    },
+
+    async updateCarne(c) {
+        if (this.dbConn) {
+            await this.dbConn.run("UPDATE carnes SET nombre=?, premium=? WHERE id=?", [c.nombre, c.premium ? 1 : 0, c.id]);
+        }
+        const idx = this.carnes.findIndex(x => x.id === c.id);
+        if (idx !== -1) this.carnes[idx] = { ...this.carnes[idx], ...c };
+    },
+
+    async deleteCarne(id) {
+        if (this.dbConn) await this.dbConn.run("DELETE FROM carnes WHERE id=?", [id]);
+        this.carnes = this.carnes.filter(c => c.id !== id);
+    },
+
+    async toggleCarne(id) {
+        const c = this.carnes.find(x => x.id === id);
+        if (c) {
+            c.disponible = !c.disponible;
+            if (this.dbConn) await this.dbConn.run("UPDATE carnes SET disponible=? WHERE id=?", [c.disponible ? 1 : 0, id]);
+        }
+    },
+
+    async addGasto(g) {
+        const f = new Date().toLocaleDateString();
+        const h = new Date().toLocaleTimeString();
+        if (this.dbConn) {
+            const res = await this.dbConn.run("INSERT INTO gastos (descripcion, monto, fecha, hora, estado) VALUES (?,?,?,?,?)", [g.descripcion, g.monto, f, h, g.estado]);
+            g.id = res.changes.lastId;
+            if (g.estado === 'pagado' && this.turnoActual) {
+                await this.dbConn.run("UPDATE turnos SET gastos = gastos + ? WHERE id=?", [g.monto, this.turnoActual.id]);
+                this.turnoActual.gastos += g.monto;
+            }
+        } else {
+            g.id = Date.now();
+        }
+        g.fecha = f; g.hora = h;
+        this.gastos.push(g);
+        return g;
+    },
+
+    async pagarGastoPendiente(id) {
+        const g = this.gastos.find(x => x.id === id);
+        if (g && g.estado === 'pendiente') {
+            g.estado = 'pagado';
+            if (this.dbConn) {
+                await this.dbConn.run("UPDATE gastos SET estado='pagado' WHERE id=?", [id]);
+                if (this.turnoActual) {
+                    await this.dbConn.run("UPDATE turnos SET gastos = gastos + ? WHERE id=?", [g.monto, this.turnoActual.id]);
+                    this.turnoActual.gastos += g.monto;
+                }
+            }
+        }
+    },
+
+    async addMesa(m) {
+        const id = Date.now();
+        const newMesa = { id, numero: (this.mesas.length + 1).toString(), x: 50, y: 50, ancho: 70, alto: 70, forma: m.forma, estado: 'libre' };
+        if (this.dbConn) {
+            await this.dbConn.run("INSERT INTO mesas (id, numero, x, y, ancho, alto, forma, estado) VALUES (?,?,?,?,?,?,?,?)", [newMesa.id, newMesa.numero, newMesa.x, newMesa.y, newMesa.ancho, newMesa.alto, newMesa.forma, newMesa.estado]);
+        }
+        this.mesas.push(newMesa);
+        return newMesa;
+    },
+
+    async updateMesa(id, data) {
+        const m = this.mesas.find(x => x.id === id);
+        if (m) {
+            Object.assign(m, data);
+            if (this.dbConn) {
+                const sets = Object.keys(data).map(k => `${k}=?`).join(', ');
+                const vals = [...Object.values(data), id];
+                await this.dbConn.run(`UPDATE mesas SET ${sets} WHERE id=?`, vals);
+            }
+        }
+    },
+
+    async eliminarMesa(id) {
+        if (this.dbConn) await this.dbConn.run("DELETE FROM mesas WHERE id=?", [id]);
+        this.mesas = this.mesas.filter(m => m.id !== id);
+    },
+
+    async getReporteGeneral(periodo = 'hoy') {
+        if (!this.dbConn) return { ventas: 0, totalGastos: 0, lista: [] };
+        let query = "SELECT * FROM pedidos WHERE estado='pagado'";
+        if (periodo === 'hoy') query += " AND fecha = '" + new Date().toLocaleDateString() + "'";
+        const res = await this.dbConn.query(query + " ORDER BY id DESC");
+        const lista = (res.values || []).map(p => ({ ...p, platos: JSON.parse(p.platos) }));
+        const ventas = lista.reduce((a, b) => a + b.total, 0);
+        
+        let gQuery = "SELECT SUM(monto) as total FROM gastos WHERE estado='pagado'";
+        if (periodo === 'hoy') gQuery += " AND fecha = '" + new Date().toLocaleDateString() + "'";
+        const gRes = await this.dbConn.query(gQuery);
+        const totalGastos = gRes.values[0].total || 0;
+        
+        return { ventas, totalGastos, lista };
+    },
+
+    async getMetricasCarnes() {
+        if (!this.dbConn) return [];
+        const res = await this.dbConn.query("SELECT platos, total FROM pedidos WHERE estado='pagado' AND fecha = ?", [new Date().toLocaleDateString()]);
+        const metrics = {};
+        (res.values || []).forEach(p => {
+            const platos = JSON.parse(p.platos);
+            platos.forEach(pl => {
+                pl.items.forEach(it => {
+                    if (it.carneId) {
+                        const c = this.carnes.find(x => x.id === it.carneId);
+                        const cNombre = c ? c.nombre : it.carneId;
+                        if (!metrics[cNombre]) metrics[cNombre] = { carne: cNombre, total_vendido: 0, total_dinero: 0 };
+                        metrics[cNombre].total_vendido += it.cantidad;
+                        metrics[cNombre].total_dinero += (it.precio * it.cantidad);
+                    }
+                });
+            });
+        });
+        return Object.values(metrics);
+    },
+
+    async registrarAsistencia(id, sueldo) {
+        await this.addLog('ASISTENCIA', `Empleado ID: ${id}, Pago: ${sueldo}`);
+        return true;
+    },
+
+    async addAdelanto(id, monto) {
+        await this.addLog('ADELANTO', `Empleado ID: ${id}, Monto: ${monto}`);
+        return true;
+    },
+
     verificarPin(p, nivel = 'admin') {
         if (nivel === 'admin') return p === this.config.pin;
-        if (nivel === 'staff') return p === this.config.pinStaff || p === this.config.pin;
+        if (nivel === 'staff') {
+            if (p === this.config.pinStaff || p === this.config.pin) return true;
+            return this.empleados.some(e => e.pin === p);
+        }
         return false;
     },
 
@@ -173,26 +415,37 @@ const db = {
         p.platos.forEach(pl => {
             pl.items.forEach(it => {
                 let pBase = it.precio;
-                if (it.isPremiumMeat) pBase += (it.nombre.toLowerCase().includes('taco') ? this.config.extraTacoPremium : this.config.extraOrdenPremium);
+                if (it.requiereCarne && it.carneId) {
+                    const carne = this.carnes.find(c => c.id === it.carneId);
+                    if (carne && carne.premium) {
+                        const extra = (it.nombre.toLowerCase().includes('taco') ? (this.config.extraTacoPremium || 7) : (this.config.extraEspecialidadPremium || 10));
+                        pBase += extra;
+                    }
+                } else if (it.requiereCarne && !it.carneId && it.precioSencillo > 0) {
+                    pBase = it.precioSencillo;
+                }
                 if (it.conQueso) pBase += 10;
                 subtotal += pBase * it.cantidad;
             });
         });
-        return conComision ? subtotal * (1 + (this.config.comisionTarjeta / 100)) : subtotal;
+        if (conComision && this.config.comisionTarjeta > 0) {
+            subtotal = subtotal * (1 + (this.config.comisionTarjeta / 100));
+        }
+        return subtotal;
     },
 
     async updatePedidoEstado(id, estado) {
         if (this.dbConn) await this.dbConn.run("UPDATE pedidos SET estado=? WHERE id=?", [estado, id]);
         const p = this.pedidosActivos.find(x => x.id === id);
         if (p) p.estado = estado;
-        if (estado === 'cancelado') this.pedidosActivos = this.pedidosActivos.filter(x => x.id !== id);
+        if (estado === 'cancelado' || estado === 'pagado') this.pedidosActivos = this.pedidosActivos.filter(x => x.id !== id);
     },
 
     async addLog(accion, detalles) {
         if (this.dbConn) {
             const f = new Date().toLocaleDateString();
             const h = new Date().toLocaleTimeString();
-            const u = 'SISTEMA';
+            const u = router.currentUser ? router.currentUser.nombre : 'SISTEMA';
             await this.dbConn.run("INSERT INTO logs_auditoria (usuario, accion, detalles, fecha, hora) VALUES (?,?,?,?,?)", [u, accion, detalles, f, h]);
         }
     },
@@ -204,41 +457,46 @@ const db = {
         p.estado = 'pagado';
         p.metodo_pago = metodo;
         if (this.dbConn) {
-            await this.dbConn.run("UPDATE pedidos SET estado='pagado', metodo_pago=? WHERE id=?", [metodo, id]);
+            await this.dbConn.run("UPDATE pedidos SET estado='pagado', metodo_pago=?, total=? WHERE id=?", [metodo, total, id]);
             if (this.turnoActual) {
                 await this.dbConn.run("UPDATE turnos SET ventas = ventas + ? WHERE id=?", [total, this.turnoActual.id]);
                 this.turnoActual.ventas += total;
             }
         }
         this.pedidosActivos = this.pedidosActivos.filter(x => x.id !== id);
-        app.showNotification("💰 VENTA REGISTRADA");
+        app.showNotification("💰 VENTA REGISTRADA: $" + total.toFixed(2));
     },
 
     async abrirTurno(monto) {
         const f = new Date().toLocaleDateString();
         const h = new Date().toLocaleTimeString();
+        const m = parseFloat(monto) || 0;
         if (this.dbConn) {
-            const res = await this.dbConn.run("INSERT INTO turnos (fecha, hora_inicio, inicioCaja, ventas, gastos, retiros, estado) VALUES (?,?,?,?,?,?,?)", [f, h, monto, 0, 0, 0, 'abierto']);
-            this.turnoActual = { id: res.changes.lastId, fecha: f, hora_inicio: h, inicioCaja: monto, ventas: 0, gastos: 0, retiros: 0, estado: 'abierto' };
+            const res = await this.dbConn.run("INSERT INTO turnos (fecha, hora_inicio, inicioCaja, ventas, gastos, retiros, estado) VALUES (?,?,?,?,?,?,?)", [f, h, m, 0, 0, 0, 'abierto']);
+            this.turnoActual = { id: res.changes.lastId, fecha: f, hora_inicio: h, inicioCaja: m, ventas: 0, gastos: 0, retiros: 0, estado: 'abierto' };
         } else {
-            this.turnoActual = { id: Date.now(), fecha: f, hora_inicio: h, inicioCaja: monto, ventas: 0, gastos: 0, retiros: 0, estado: 'abierto' };
+            this.turnoActual = { id: Date.now(), fecha: f, hora_inicio: h, inicioCaja: m, ventas: 0, gastos: 0, retiros: 0, estado: 'abierto' };
         }
+        await this.addLog('APERTURA', `Fondo Inicial: ${m}`);
     },
 
-    async cerrarTurno() {
+    async cerrarTurno(montoReal) {
         if (!this.turnoActual) return;
         const h = new Date().toLocaleTimeString();
+        const mR = parseFloat(montoReal) || 0;
         if (this.dbConn) {
             await this.dbConn.run("UPDATE turnos SET estado='cerrado', hora_fin=? WHERE id=?", [h, this.turnoActual.id]);
+            await this.addLog('CORTE', `Caja Final: ${mR}, Esperado: ${this.turnoActual.inicioCaja + this.turnoActual.ventas - this.turnoActual.gastos - this.turnoActual.retiros}`);
         }
         this.turnoActual = null;
     },
 
     async registrarRetiro(monto, desc) {
+        const m = parseFloat(monto) || 0;
         if (this.dbConn && this.turnoActual) {
-            await this.dbConn.run("UPDATE turnos SET retiros = retiros + ? WHERE id=?", [monto, this.turnoActual.id]);
-            this.turnoActual.retiros += monto;
-            await this.addLog('RETIRO', `Monto: ${monto}, Motivo: ${desc}`);
+            await this.dbConn.run("UPDATE turnos SET retiros = retiros + ? WHERE id=?", [m, this.turnoActual.id]);
+            this.turnoActual.retiros += m;
+            await this.addLog('RETIRO', `Monto: ${m}, Motivo: ${desc}`);
         }
     },
 
@@ -253,11 +511,7 @@ const db = {
                 }
                 this.dbConn = null;
             }
-            
-            // Re-inicializar
             await this.init();
-            
-            // Verificar integridad básica
             if (this.dbConn) {
                 await this.dbConn.execute("PRAGMA integrity_check;");
                 await this.addLog('SISTEMA', 'Conexión a BD reparada manualmente');
