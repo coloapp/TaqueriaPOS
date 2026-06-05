@@ -552,10 +552,11 @@ const router = {
                             </div>
                         `).join('')}
                     </div>
+                    ${p?.nombre.toLowerCase().includes('lonche') ? `
                     <div style="margin-top:15px;">
                         <label><b>Extra Queso (+ $):</b></label>
                         <input type="number" id="ed-var-queso" value="${v['queso'] || 0}" style="width:100%; padding:8px;">
-                    </div>
+                    </div>` : '<input type="hidden" id="ed-var-queso" value="0">'}
                 </div>
 
                 <div style="display:flex; gap:10px;">
