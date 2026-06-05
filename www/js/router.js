@@ -362,7 +362,12 @@ const router = {
             this.navigate('caja'); 
         }); 
     },
-    showRetiroModal() { const m = prompt("Monto a retirar:"); if(m) { db.registrarRetiro(parseFloat(m), "Retiro parcial"); this.renderCaja(); } },
+    showRetiroModal() { 
+        const m = prompt("Monto a retirar:"); 
+        if(m) { 
+            db.registrarRetiro(parseFloat(m), "Retiro parcial").then(() => this.renderCaja()); 
+        } 
+    },
     showPaymentModal(id) {
         const p = db.pedidosActivos.find(x => x.id === id); const t = db.calcularTotal(p); const tc = db.calcularTotal(p, true);
         const m = document.createElement('div'); m.className = 'modal-full'; m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:20000;";
@@ -392,8 +397,19 @@ const router = {
 
     renderCocina() {
         const content = document.getElementById('content');
+        // Filtramos: Solo pendientes Y que no estén pagados
         const pedidos = db.pedidosActivos.filter(p => p.estado === 'pendiente');
-        content.innerHTML = `<div style="padding:15px; height:100%;" class="scrollable-y"><h2>Monitor de Cocina</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:15px;">${pedidos.map(p => `<div class="admin-card" style="border-top:5px solid var(--primary);"><b>${p.tipo==='mesa'?'MESA '+p.mesaNumero:p.tipo.toUpperCase()}</b><br>${p.platos.map((pl, i) => `<div style="background:#f9f9f9; padding:8px; margin-top:5px;"><b>P${i+1}</b>: ${pl.items.map(it => it.cantidad+' '+it.nombre).join(', ')}<br><small>${pl.sinCebolla?'S/Ceb':''} ${pl.sinCilantro?'S/Cil':''} ${pl.sinVerdura?'S/Ver':''}</small></div>`).join('')}<button class="btn-primary" style="width:100%; background:#4CAF50; margin-top:10px;" onclick="router.handleOrdenLista(${p.id})">DESPACHAR ✓</button></div>`).join('')}</div></div>`;
+        content.innerHTML = `<div style="padding:15px; height:100%;" class="scrollable-y"><h2>Monitor de Cocina</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:15px;">${pedidos.map(p => `<div class="admin-card" style="border-top:5px solid var(--primary);"><b>${p.tipo==='mesa'?'MESA '+p.mesaNumero:p.tipo.toUpperCase() + ' #' + (p.id % 1000)}</b><br><small>Mesero: ${p.cliente?.mesero || 'Caja'}</small><br>${p.platos.map((pl, i) => `<div style="background:#f9f9f9; padding:8px; margin-top:5px;"><b>P${i+1}</b>: ${pl.items.map(it => it.cantidad+' '+it.nombre).join(', ')}<br><small>${pl.sinCebolla?'S/Ceb':''} ${pl.sinCilantro?'S/Cil':''} ${pl.sinVerdura?'S/Ver':''}</small></div>`).join('')}<button class="btn-primary" style="width:100%; background:#4CAF50; margin-top:10px;" onclick="router.handleOrdenLista(${p.id})">DESPACHAR ✓</button></div>`).join('')}</div></div>`;
+        this.updateMonitorBadge();
+    },
+
+    updateMonitorBadge() {
+        const count = db.pedidosActivos.filter(p => p.estado === 'pendiente').length;
+        const badges = document.querySelectorAll('.monitor-badge');
+        badges.forEach(b => {
+            b.innerText = count;
+            b.style.display = count > 0 ? 'flex' : 'none';
+        });
     },
     async handleOrdenLista(id) { await db.updatePedidoEstado(id, 'listo'); this.renderCocina(); },
 
@@ -621,3 +637,79 @@ const router = {
     },
     async handleRepairDB() { if(confirm("¿Reparar?")) { await db.repairConnection(); this.navigate('pos'); } },
 
+    // --- EDITOR CROQUIS ---
+    renderEditorCroquis() {
+        const content = document.getElementById('content');
+        content.innerHTML = `
+            <div style="padding:15px; height:100%; display:flex; flex-direction:column;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h2>Constructor de Mesas</h2>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-accent" onclick="router.handleAddMesa('cuadrada')">+ CUADRADA</button>
+                        <button class="btn-accent" onclick="router.handleAddMesa('redonda')">+ REDONDA</button>
+                        <button class="btn-primary" onclick="router.navigate('mesas')">FINALIZAR</button>
+                    </div>
+                </div>
+                <p style="font-size:0.7rem; color:#666;">Arrastra las mesas para acomodarlas. Haz click en el número para eliminar.</p>
+                <div id="canvas-mesas" style="flex:1; background:#f0f0f0; border:2px dashed #ccc; position:relative; overflow:hidden; border-radius:15px;"></div>
+            </div>
+        `;
+        db.mesas.forEach(mesa => this.renderMesaEditor(mesa, document.getElementById('canvas-mesas')));
+    },
+    renderMesaEditor(mesa, canvas) {
+        const div = document.createElement('div');
+        div.className = 'mesa-diseno';
+        div.style = `position:absolute; left:${mesa.x}px; top:${mesa.y}px; width:${mesa.ancho}px; height:${mesa.alto}px; background:white; border:2px solid var(--primary); border-radius:${mesa.forma==='redonda'?'50%':'12px'}; display:flex; justify-content:center; align-items:center; cursor:move; box-shadow:var(--shadow); user-select:none;`;
+        div.innerHTML = `<span style="font-weight:bold; font-size:1.2rem;">#${mesa.numero}</span>`;
+
+        let startX, startY, initialX, initialY;
+        const onStart = (e) => {
+            if (e.target.tagName === 'SPAN' && confirm(`¿Eliminar mesa ${mesa.numero}?`)) {
+                db.eliminarMesa(mesa.id).then(() => this.renderEditorCroquis());
+                return;
+            }
+            startX = (e.type.includes('touch') ? e.touches[0].clientX : e.clientX);
+            startY = (e.type.includes('touch') ? e.touches[0].clientY : e.clientY);
+            initialX = mesa.x; initialY = mesa.y;
+            const moveHandler = (me) => onMove(me);
+            const endHandler = () => {
+                window.removeEventListener('mousemove', moveHandler);
+                window.removeEventListener('mouseup', endHandler);
+                window.removeEventListener('touchmove', moveHandler);
+                window.removeEventListener('touchend', endHandler);
+                db.updateMesa(mesa.id, {x: mesa.x, y: mesa.y});
+            };
+            window.addEventListener('mousemove', moveHandler);
+            window.addEventListener('mouseup', endHandler);
+            window.addEventListener('touchmove', moveHandler);
+            window.addEventListener('touchend', endHandler);
+        };
+        const onMove = (e) => {
+            const x = (e.type.includes('touch') ? e.touches[0].clientX : e.clientX);
+            const y = (e.type.includes('touch') ? e.touches[0].clientY : e.clientY);
+            mesa.x = Math.max(0, initialX + (x - startX));
+            mesa.y = Math.max(0, initialY + (y - startY));
+            div.style.left = mesa.x + 'px'; div.style.top = mesa.y + 'px';
+        };
+        div.addEventListener('mousedown', onStart);
+        div.addEventListener('touchstart', onStart);
+        canvas.appendChild(div);
+    },
+    async handleAddMesa(f) { await db.addMesa({ forma: f }); this.renderEditorCroquis(); },
+
+    renderDispositivos() { 
+        const content = document.getElementById('content');
+        content.innerHTML = `
+            <div style="padding:20px;">
+                <h2>📱 Dispositivos y Red</h2>
+                <div class="admin-card">
+                    <p><b>ID de este equipo:</b><br><span style="font-family:monospace; font-size:1.2rem;">${db.config.deviceId}</span></p>
+                    <p><b>Rol Actual:</b> ${sync.role.toUpperCase()}</p>
+                    <p><b>Estado:</b> <span id="sync-status-detail">${sync.serverIP ? 'Conectado a ' + sync.serverIP : 'Modo Servidor (Caja)'}</span></p>
+                </div>
+                ${sync.role === 'mesero' ? `<button class="btn-primary" onclick="sync.showDiscovery()">🔄 BUSCAR CAJA NUEVAMENTE</button>` : ''}
+            </div>
+        `;
+    },
+    async handleToggleCarne(id) { await db.toggleCarne(id); this.renderAdminCarnes(); }
+    };

@@ -163,7 +163,8 @@ const app = {
                 <button id="btn-pos-nav" onclick="router.navigate('pos')">POS</button>
                 <button id="btn-mesas-nav" onclick="router.navigate('mesas')">Mesas</button>
                 <button id="btn-caja-nav" onclick="router.navigate('caja')">Caja</button>
-                <button id="btn-monitor-nav" onclick="router.navigate('cocina')">Monitor</button>
+                <button id="btn-monitor-nav" onclick="router.navigate('cocina')" style="position:relative;">Monitor <span class="monitor-badge" style="display:none;">0</span></button>
+
             `;
         } else {
             mainNav.innerHTML = `<button id="btn-mesas-nav" onclick="router.navigate('mesas')">Mesas</button>`;
