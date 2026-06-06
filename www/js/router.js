@@ -208,7 +208,7 @@ const router = {
 
     showMeatSelector(prod) {
         const m = document.createElement('div'); m.className = 'modal-full';
-        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:25000;";
+        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:flex-start; z-index:25000; overflow-y:auto; padding:20px 0;";
         const isLonche = prod.nombre.toLowerCase().includes('lonche');
         const v = prod.variantes || {};
         
@@ -253,7 +253,7 @@ const router = {
 
     showMultipleMeatSelector(prod) {
         const m = document.createElement('div'); m.className = 'modal-full';
-        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:25000;";
+        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:flex-start; z-index:25000; overflow-y:auto; padding:20px 0;";
         
         const isGrande = prod.nombre.toLowerCase().includes('grande');
         const limit = isGrande ? 4 : 3; 
@@ -399,16 +399,41 @@ const router = {
     async enviarOrden() {
         if (this._enviando) return;
         if (this.ordenActual.platos.every(p => p.items.length === 0)) return;
-        
+
+        const isUpdate = !!this.ordenActual.id;
         this._enviando = true;
         try {
-            const pedido = { id: this.ordenActual.id || Date.now(), tipo: this.orderType, mesaId: this.currentMesa?.id, mesaNumero: this.currentMesa?.numero, cliente: { ...this.cliente }, platos: JSON.parse(JSON.stringify(this.ordenActual.platos)), estado: 'pendiente' };
-            await db.guardarPedido(pedido); await sync.enviarOrdenACaja(pedido);
+            const pedido = { 
+                id: this.ordenActual.id || Date.now(), 
+                tipo: this.orderType, 
+                mesaId: this.currentMesa?.id, 
+                mesaNumero: this.currentMesa?.numero, 
+                cliente: { ...this.cliente }, 
+                platos: JSON.parse(JSON.stringify(this.ordenActual.platos)), 
+                estado: 'pendiente',
+                esExtra: isUpdate
+            };
+            
+            await db.guardarPedido(pedido); 
+            await sync.enviarOrdenACaja(pedido);
+
             if (sync.role === 'caja') {
-                await printer.sendToPrinter(printer.formatKitchenOrder(pedido), pedido, 'cocina', true);
-                if (pedido.tipo !== 'mesa') await printer.sendToPrinter(printer.formatBill(pedido), pedido, 'cuenta', true);
+                // REGLA: Las mesas solo imprimen la primera comanda por defecto. 
+                // Si es actualización, solo imprimen si 'imprimirExtras' está habilitado.
+                const debaImprimirCocina = !isUpdate || db.config.imprimirExtras;
+                
+                if (debaImprimirCocina) {
+                    await printer.printOrder(pedido);
+                }
+
+                // Para llevar y domicilio imprimen ticket de cuenta inmediatamente
+                if (pedido.tipo !== 'mesa') {
+                    await printer.printBill(pedido);
+                }
             }
-            app.showNotification("✅ ORDEN ENVIADA"); this.resetPOS(); this.navigate('pos');
+            app.showNotification("✅ ORDEN ENVIADA"); 
+            this.resetPOS(); 
+            this.navigate('pos');
         } catch (e) {
             console.error(e);
             app.showNotification("❌ Error al enviar orden");
@@ -510,6 +535,13 @@ const router = {
             fiarA = prompt("¿A quién se le fía?");
             if (!fiarA) return;
         }
+
+        const p = db.pedidosActivos.find(x => x.id === id);
+        if (p) {
+            // Imprimir ticket final al cobrar
+            await printer.printBill(p, m === 'tarjeta');
+        }
+
         await db.cobrarPedido(id, m, fiarA); 
         document.querySelector('.modal-full').remove(); 
         this.renderCaja(); 
@@ -900,15 +932,60 @@ const router = {
 
     renderConfig() {
         const content = document.getElementById('content');
-        content.innerHTML = `<div style="padding:20px; height:100%;" class="scrollable-y"><h2>Configuración</h2><div class="admin-card"><label>Nombre Taquería:</label><input type="text" id="cf-n" value="${db.config.nombreTaqueria}" style="width:100%; padding:10px; margin-bottom:10px;"><label>Extra Taco Premium ($):</label><input type="number" id="cf-et" value="${db.config.extraTacoPremium}" style="width:100%; padding:10px; margin-bottom:10px;"><label>Extra Especialidad Premium ($):</label><input type="number" id="cf-ep" value="${db.config.extraEspecialidadPremium}" style="width:100%; padding:10px; margin-bottom:10px;"><label>Comisión Tarjeta %:</label><input type="number" id="cf-c" value="${db.config.comisionTarjeta}" style="width:100%; padding:10px; margin-bottom:10px;"><button class="btn-primary" style="width:100%;" onclick="router.guardarConfig()">GUARDAR CONFIGURACIÓN</button><br><br><button class="btn-secondary" onclick="router.handleRepairDB()">🛠️ REPARAR BASE DE DATOS</button></div></div>`;
+        content.innerHTML = `
+            <div style="padding:20px; height:100%;" class="scrollable-y">
+                <h2>Configuración</h2>
+                <div class="admin-card">
+                    <label>Nombre Taquería:</label>
+                    <input type="text" id="cf-n" value="${db.config.nombreTaqueria}" style="width:100%; padding:10px; margin-bottom:10px;">
+                    
+                    <label>Dirección:</label>
+                    <input type="text" id="cf-dir" value="${db.config.direccion || ''}" style="width:100%; padding:10px; margin-bottom:10px;">
+                    
+                    <label>Teléfono:</label>
+                    <input type="text" id="cf-tel" value="${db.config.telefono || ''}" style="width:100%; padding:10px; margin-bottom:10px;">
+
+                    <hr>
+                    <label><input type="checkbox" id="cf-ie" ${db.config.imprimirExtras ? 'checked' : ''}> Imprimir Comandas de EXTRAS</label><br>
+                    <label><input type="checkbox" id="cf-uc" ${db.config.usarImpresoraCocina ? 'checked' : ''} onchange="document.getElementById('cocina-mac-area').style.display = this.checked ? 'block' : 'none'"> Usar Impresora de COCINA separada</label>
+                    
+                    <div id="cocina-mac-area" style="display:${db.config.usarImpresoraCocina ? 'block' : 'none'}; margin-top:10px; padding:10px; background:#f0f0f0; border-radius:10px;">
+                        <label>MAC Impresora COCINA:</label>
+                        <input type="text" id="cf-mc" value="${db.config.bluetoothMAC_Cocina || ''}" placeholder="00:00:00:00:00:00" style="width:100%; padding:10px; margin-bottom:10px;">
+                    </div>
+
+                    <div style="margin-top:10px;">
+                        <label>MAC Impresora CAJA (Principal):</label>
+                        <input type="text" id="cf-m" value="${db.config.bluetoothMAC || ''}" placeholder="00:00:00:00:00:00" style="width:100%; padding:10px; margin-bottom:10px;">
+                    </div>
+
+                    <hr>
+                    <label>Extra Taco Premium ($):</label>
+                    <input type="number" id="cf-et" value="${db.config.extraTacoPremium}" style="width:100%; padding:10px; margin-bottom:10px;">
+                    <label>Extra Especialidad Premium ($):</label>
+                    <input type="number" id="cf-ep" value="${db.config.extraEspecialidadPremium}" style="width:100%; padding:10px; margin-bottom:10px;">
+                    <label>Comisión Tarjeta %:</label>
+                    <input type="number" id="cf-c" value="${db.config.comisionTarjeta}" style="width:100%; padding:10px; margin-bottom:10px;">
+                    
+                    <button class="btn-primary" style="width:100%; margin-top:20px;" onclick="router.guardarConfig()">GUARDAR CONFIGURACIÓN</button>
+                    <br><br>
+                    <button class="btn-secondary" onclick="router.handleRepairDB()">🛠️ REPARAR BASE DE DATOS</button>
+                </div>
+            </div>`;
     },
     async guardarConfig() { 
         db.config.nombreTaqueria = document.getElementById('cf-n').value; 
+        db.config.direccion = document.getElementById('cf-dir').value;
+        db.config.telefono = document.getElementById('cf-tel').value;
+        db.config.imprimirExtras = document.getElementById('cf-ie').checked;
+        db.config.usarImpresoraCocina = document.getElementById('cf-uc').checked;
+        db.config.bluetoothMAC = document.getElementById('cf-m').value;
+        db.config.bluetoothMAC_Cocina = document.getElementById('cf-mc')?.value || '';
         db.config.extraTacoPremium = parseFloat(document.getElementById('cf-et').value);
         db.config.extraEspecialidadPremium = parseFloat(document.getElementById('cf-ep').value);
         db.config.comisionTarjeta = parseFloat(document.getElementById('cf-c').value); 
         await db.save(); 
-        app.showNotification("Guardado ✓"); 
+        app.showNotification("Configuración Guardada ✓"); 
     },
     async handleRepairDB() { if(confirm("¿Reparar?")) { await db.repairConnection(); this.navigate('pos'); } },
 
@@ -1005,9 +1082,17 @@ const router = {
     }
     };
 
-// Listener global para cerrar dropdowns al hacer click fuera
+// Listener global para cerrar dropdowns y sidebar al hacer click fuera
 document.addEventListener('click', (e) => {
+    // Cerrar dropdowns
     if (!e.target.matches('.dropdown-trigger')) {
         document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
+    }
+    
+    // Cerrar sidebar al hacer click fuera
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('btn-sidebar-toggle');
+    if (router.sidebarActive && sidebar && !sidebar.contains(e.target) && !toggleBtn.contains(e.target)) {
+        router.closeSidebar();
     }
 });
