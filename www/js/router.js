@@ -326,6 +326,11 @@ const router = {
         document.querySelectorAll('.modal-full').forEach(m => m.remove());
         this.refreshOrderList(); 
         app.showNotification(`+ ${prod.nombre}`);
+
+        // Auto-mostrar panel en movil al agregar
+        if (window.innerWidth < 960) {
+            document.getElementById('order-side').classList.add('mobile-active');
+        }
     },
 
     renderOrderPanel() {
@@ -333,7 +338,8 @@ const router = {
         const isUpdate = !!this.ordenActual.id;
         container.innerHTML = `
             <div style="background:var(--primary); color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
-                <b>${this.orderType.toUpperCase()} ${this.currentMesa ? '#'+this.currentMesa.numero : ''}</b>
+                <button class="btn-close-order" onclick="router.collapseMobileOrder()">↓</button>
+                <b style="flex:1; text-align:center;">${this.orderType.toUpperCase()} ${this.currentMesa ? '#'+this.currentMesa.numero : ''}</b>
                 <button class="btn-accent" onclick="router.nuevoPlato()" style="padding:4px 10px; font-size:0.7rem;">+ PLATO</button>
             </div>
             <div style="padding:6px; background:#eee; display:flex; gap:4px;">
@@ -389,12 +395,19 @@ const router = {
             const list = document.getElementById('platos-lista');
             if (list) list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' });
         }, 100);
+
+        // Auto-mostrar panel en movil
+        if (window.innerWidth < 960) {
+            document.getElementById('order-side').classList.add('mobile-active');
+        }
     },
     eliminarItem(idx) { this.ordenActual.platos[this.currentPlatoIdx].items.splice(idx, 1); this.refreshOrderList(); },
     eliminarPlatoEspecifico(idx) { if(this.ordenActual.platos.length > 1) { this.ordenActual.platos.splice(idx, 1); if(this.currentPlatoIdx >= this.ordenActual.platos.length) this.currentPlatoIdx = 0; this.renderOrderPanel(); } },
     toggleSwitch(idx, f) { this.ordenActual.platos[idx][f] = !this.ordenActual.platos[idx][f]; this.refreshOrderList(); },
     setOrderType(t) { this.orderType = t; this.renderOrderPanel(); },
     toggleMobileOrder() { document.getElementById('order-side').classList.toggle('mobile-active'); },
+    collapseMobileOrder() { document.getElementById('order-side').classList.remove('mobile-active'); },
+
 
     async enviarOrden() {
         if (this._enviando) return;
