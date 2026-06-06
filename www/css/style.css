@@ -127,53 +127,141 @@ main#content {
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Responsive Logic */
-
-/* Mobile Portrait & Small Screens (Accordion/Slide-up behavior) */
-@media (max-width: 959px) {
+/* 1. CONFIGURACIÓN RESTRICCION VERTICAL (Mobile) */
+@media (max-width: 768px) {
     .pos-main-wrapper {
-        flex-direction: column;
+        flex-direction: column !important;
+    }
+
+    .catalog-container {
+        height: 60vh !important;
+        flex: none !important;
+        overflow-y: auto !important;
+        padding-bottom: 15px !important;
     }
 
     .order-side-panel {
-        position: fixed;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        height: 80vh;
-        z-index: 5000;
-        transform: translateY(100%); /* Oculto por defecto abajo */
-        box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 40vh !important;
+        max-height: 40vh !important;
+        min-height: 40vh !important;
+        transform: translateY(0) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        box-shadow: 0 -10px 30px rgba(0,0,0,0.2) !important;
         border-top-left-radius: 20px;
         border-top-right-radius: 20px;
         overflow: hidden;
+        z-index: 5000;
     }
 
-    .order-side-panel.mobile-active {
-        transform: translateY(0);
+    /* Contenedor de platos horizontal */
+    #platos-lista {
+        display: flex !important;
+        flex-direction: row !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        scroll-snap-type: x mandatory !important;
+        gap: 12px !important;
+        padding: 10px !important;
+        background: #f5f5f5 !important;
+    }
+
+    .plato-card {
+        flex: 0 0 75% !important;
+        width: 75% !important;
+        scroll-snap-align: start !important;
+        margin-bottom: 0 !important;
     }
 
     .floating-actions {
-        display: flex;
+        display: none !important; /* Oculto ya que el panel es siempre visible 40vh */
     }
 }
 
-/* Tablet Landscape & Desktop (Side-by-side) */
-@media (min-width: 960px) {
+/* 2. CONFIGURACIÓN RESTRICCION HORIZONTAL (Desktop/Tablet) */
+@media (min-width: 769px) {
+    .pos-main-wrapper {
+        display: grid !important;
+        grid-template-columns: 60% 40% !important;
+        height: calc(100vh - 60px) !important;
+        overflow: hidden !important;
+    }
+
+    .catalog-container {
+        height: 100% !important;
+        overflow-y: auto !important;
+    }
+
     .order-side-panel {
         position: relative !important;
+        height: 100% !important;
+        width: 100% !important;
         transform: none !important;
         display: flex !important;
-        height: 100%;
+        flex-direction: column !important;
+    }
+
+    #platos-lista {
+        display: block !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+
+    .plato-card {
+        flex: none !important;
+        width: 100% !important;
+        margin-bottom: 15px !important;
     }
 
     .floating-actions {
         display: none !important;
     }
-    
-    .btn-close-order {
-        display: none !important;
-    }
+}
+
+/* 3. REDISEÑO DE COMPONENTES */
+
+/* Botón Añadir Plato */
+.order-side-panel .btn-accent {
+    background: white !important;
+    color: #c62828 !important;
+    border: 2px solid #c62828 !important;
+    padding: 6px 16px !important;
+    font-size: 0.85rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    border-radius: 20px !important;
+    transition: all 0.2s;
+}
+
+.order-side-panel .btn-accent:active {
+    background: #c62828 !important;
+    color: white !important;
+}
+
+/* Botón Enviar Orden */
+.order-side-panel .btn-primary {
+    width: 90% !important;
+    margin: 10px auto !important;
+    background: linear-gradient(135deg, #d32f2f, #b71c1c) !important;
+    color: white !important;
+    border: none !important;
+    padding: 12px !important;
+    font-size: 1.05rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    border-radius: 10px !important;
+    box-shadow: 0 4px 10px rgba(183, 28, 28, 0.25) !important;
+    transition: all 0.2s;
+}
+
+.order-side-panel .btn-primary:active {
+    transform: scale(0.98) !important;
+    box-shadow: 0 2px 5px rgba(183, 28, 28, 0.2) !important;
 }
 
 .btn-close-order {
