@@ -43,6 +43,13 @@ const db = {
             this.config = { ...this.config, ...JSON.parse(savedConfig) };
         }
 
+        // Cargar turnoActual desde localStorage como fallback rápido
+        const savedTurno = localStorage.getItem('tpos_turno_actual');
+        if (savedTurno) {
+            this.turnoActual = JSON.parse(savedTurno);
+            console.log("DB: Turno restaurado desde cache:", this.turnoActual);
+        }
+
         if (window.Capacitor && window.Capacitor.isNativePlatform()) {
             try {
                 const { SQLiteConnection } = Capacitor.Plugins.CapacitorSQLite;
@@ -150,7 +157,17 @@ const db = {
             this.mesas = mesaRes.values || [];
             const turRes = await this.dbConn.query("SELECT * FROM turnos ORDER BY id DESC");
             this.turnos = turRes.values || [];
-            this.turnoActual = this.turnos.find(t => t.estado === 'abierto') || null;
+            
+            // Si no se cargó de localStorage o queremos asegurar que esté sincronizado con DB
+            const openTurno = this.turnos.find(t => t.estado === 'abierto') || null;
+            if (openTurno) {
+                this.turnoActual = openTurno;
+                this.saveTurnoCache();
+            } else {
+                this.turnoActual = null;
+                localStorage.removeItem('tpos_turno_actual');
+            }
+
             const gasRes = await this.dbConn.query("SELECT * FROM gastos ORDER BY id DESC");
             this.gastos = gasRes.values || [];
             const empRes = await this.dbConn.query("SELECT * FROM empleados");
@@ -190,10 +207,26 @@ const db = {
         ];
         this.mesas = [{id:1, numero:'1', x:50, y:50, ancho:70, alto:70, forma:'cuadrada'}];
         this.pedidosActivos = [];
+
+        // Restaurar turnoActual desde localStorage en modo Mock si existe
+        const savedTurno = localStorage.getItem('tpos_turno_actual');
+        if (savedTurno) {
+            this.turnoActual = JSON.parse(savedTurno);
+            console.log("DB (Mock): Turno restaurado desde cache:", this.turnoActual);
+        }
+    },
+
+    saveTurnoCache() {
+        if (this.turnoActual) {
+            localStorage.setItem('tpos_turno_actual', JSON.stringify(this.turnoActual));
+        } else {
+            localStorage.removeItem('tpos_turno_actual');
+        }
     },
 
     async save() {
         localStorage.setItem('tpos_config', JSON.stringify(this.config));
+        this.saveTurnoCache();
         if (this.dbConn && typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
     },
 
@@ -384,7 +417,10 @@ const db = {
             if (g.estado === 'pagado' && this.turnoActual) {
                 await this.dbConn.run("UPDATE turnos SET gastos = gastos + ? WHERE id=?", [g.monto, this.turnoActual.id]);
                 const tRes = await this.dbConn.query("SELECT * FROM turnos WHERE id = ?", [this.turnoActual.id]);
-                if (tRes.values && tRes.values.length > 0) this.turnoActual = tRes.values[0];
+                if (tRes.values && tRes.values.length > 0) {
+                    this.turnoActual = tRes.values[0];
+                    this.saveTurnoCache();
+                }
             }
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         } else {
@@ -404,7 +440,10 @@ const db = {
                 if (this.turnoActual) {
                     await this.dbConn.run("UPDATE turnos SET gastos = gastos + ? WHERE id=?", [g.monto, this.turnoActual.id]);
                     const tRes = await this.dbConn.query("SELECT * FROM turnos WHERE id = ?", [this.turnoActual.id]);
-                    if (tRes.values && tRes.values.length > 0) this.turnoActual = tRes.values[0];
+                    if (tRes.values && tRes.values.length > 0) {
+                        this.turnoActual = tRes.values[0];
+                        this.saveTurnoCache();
+                    }
                 }
                 if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
             }
@@ -618,11 +657,23 @@ const db = {
                 await this.dbConn.run("UPDATE turnos SET ventas = ventas + ?, ventas_efectivo = ventas_efectivo + ? WHERE id=?", [total, addEfectivo, this.turnoActual.id]);
                 // RECARGA CRÍTICA DEL TURNO
                 const tRes = await this.dbConn.query("SELECT * FROM turnos WHERE id = ?", [this.turnoActual.id]);
-                if (tRes.values && tRes.values.length > 0) this.turnoActual = tRes.values[0];
+                if (tRes.values && tRes.values.length > 0) {
+                    this.turnoActual = tRes.values[0];
+                    this.saveTurnoCache();
+                }
             }
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
             // Automatizar badge
             if (typeof router !== 'undefined' && router.updateMonitorBadge) router.updateMonitorBadge();
+        } else {
+            // Fallback en memoria si no hay DB (Modo Web/Mesero)
+            if (this.turnoActual) {
+                this.turnoActual.ventas = (this.turnoActual.ventas || 0) + total;
+                if (metodo === 'efectivo') {
+                    this.turnoActual.ventas_efectivo = (this.turnoActual.ventas_efectivo || 0) + total;
+                }
+                this.saveTurnoCache();
+            }
         }
         this.pedidosActivos = this.pedidosActivos.filter(x => x.id !== id);
         app.showNotification(metodo === 'fiado' ? "📝 DEUDA REGISTRADA" : "💰 VENTA REGISTRADA");
@@ -633,11 +684,18 @@ const db = {
         const h = new Date().toLocaleTimeString();
         const m = parseFloat(monto) || 0;
         if (this.dbConn) {
-            const res = await this.dbConn.run("INSERT INTO turnos (fecha, hora_inicio, inicioCaja, ventas, ventas_efectivo, gastos, retiros, estado) VALUES (?,?,?,?,?,?,?,?)", [hoy, h, m, 0, 0, 0, 0, 'abierto']);
-            this.turnoActual = { id: res.changes.lastId, fecha: hoy, hora_inicio: h, inicioCaja: m, ventas: 0, ventas_efectivo: 0, gastos: 0, retiros: 0, estado: 'abierto' };
+            await this.dbConn.run("INSERT INTO turnos (fecha, hora_inicio, inicioCaja, ventas, ventas_efectivo, gastos, retiros, estado) VALUES (?,?,?,?,?,?,?,?)", [hoy, h, m, 0, 0, 0, 0, 'abierto']);
+            
+            // Obtener el ID real generado por SQLite de forma segura
+            const idRes = await this.dbConn.query("SELECT last_insert_rowid() as id");
+            const lastId = (idRes.values && idRes.values[0]) ? idRes.values[0].id : Date.now();
+            
+            this.turnoActual = { id: lastId, fecha: hoy, hora_inicio: h, inicioCaja: m, ventas: 0, ventas_efectivo: 0, gastos: 0, retiros: 0, estado: 'abierto' };
+            this.saveTurnoCache();
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         } else {
             this.turnoActual = { id: Date.now(), fecha: hoy, hora_inicio: h, inicioCaja: m, ventas: 0, ventas_efectivo: 0, gastos: 0, retiros: 0, estado: 'abierto' };
+            this.saveTurnoCache();
         }
         await this.addLog('APERTURA', `Fondo Inicial: ${m}`);
     },
@@ -648,10 +706,11 @@ const db = {
         const mR = parseFloat(montoReal) || 0;
         if (this.dbConn) {
             await this.dbConn.run("UPDATE turnos SET estado='cerrado', hora_fin=? WHERE id=?", [h, this.turnoActual.id]);
-            await this.addLog('CORTE', `Caja Final: ${mR}, Esperado: ${this.turnoActual.inicioCaja + this.turnoActual.ventas_efectivo - this.turnoActual.gastos - this.turnoActual.retiros}`);
+            await this.addLog('CORTE', `Caja Final: ${mR}, Esperado: ${this.turnoActual.inicioCaja + (this.turnoActual.ventas_efectivo || 0) - (this.turnoActual.gastos || 0) - (this.turnoActual.retiros || 0)}`);
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
         this.turnoActual = null;
+        this.saveTurnoCache();
     },
 
     async registrarRetiro(monto, desc) {
@@ -660,10 +719,16 @@ const db = {
             await this.dbConn.run("UPDATE turnos SET retiros = retiros + ? WHERE id=?", [m, this.turnoActual.id]);
             // RECARGA CRÍTICA DEL TURNO
             const tRes = await this.dbConn.query("SELECT * FROM turnos WHERE id = ?", [this.turnoActual.id]);
-            if (tRes.values && tRes.values.length > 0) this.turnoActual = tRes.values[0];
+            if (tRes.values && tRes.values.length > 0) {
+                this.turnoActual = tRes.values[0];
+                this.saveTurnoCache();
+            }
 
             await this.addLog('RETIRO', `Monto: ${m}, Motivo: ${desc}`);
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
+        } else if (this.turnoActual) {
+            this.turnoActual.retiros = (this.turnoActual.retiros || 0) + m;
+            this.saveTurnoCache();
         }
     },
 
