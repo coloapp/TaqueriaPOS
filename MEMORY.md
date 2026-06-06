@@ -51,3 +51,4 @@ Sistema de punto de venta (POS) offline para una taquería. Gestión de ventas, 
 - [05/06/2026 18:25:00.25] APK Generado con exito. 
 - [06/06/2026  2:52:21.62] APK Generado con exito. 
 - [06/06/2026  3:03:59.59] APK Generado con exito. 
+- [06/06/2026  3:18:35.42] APK Generado con exito. 

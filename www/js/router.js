@@ -440,7 +440,7 @@ const router = {
             return;
         }
         const t = db.turnoActual;
-        const efectivo = (t.inicioCaja + t.ventas - t.gastos - (t.retiros || 0));
+        const efectivo = (t.inicioCaja + (t.ventas_efectivo || 0) - t.gastos - (t.retiros || 0));
         content.innerHTML = `
             <div style="padding:20px; height:100%;" class="scrollable-y">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;"><h2>Control de Caja</h2><button class="btn-accent" onclick="router.askForPin('admin', () => router.showRetiroModal())">💸 RETIRO</button></div>
@@ -753,6 +753,7 @@ const router = {
         m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:20000;";
         const v = p?.variantes || {};
         const isTaco = p?.categoria === 'Tacos';
+        const isOrden = p?.categoria === 'Ordenes';
         
         m.innerHTML = `
             <div style="background:white; padding:25px; border-radius:25px; width:95%; max-width:450px; max-height:95vh; overflow-y:auto;" class="scrollable-y">
@@ -771,14 +772,14 @@ const router = {
                         </div>
                         <div>
                             <label style="font-size:0.7rem; font-weight:bold; color:#888;">P. SENCILLO:</label>
-                            <input type="number" id="ed-ps" value="${p?p.precioSencillo||0:0}" style="width:100%; padding:15px; border-radius:12px; border:1px solid #ddd;" ${isTaco?'disabled':''}>
+                            <input type="number" id="ed-ps" value="${p?p.precioSencillo||0:0}" style="width:100%; padding:15px; border-radius:12px; border:1px solid #ddd;" ${(isTaco || isOrden)?'disabled':''}>
                         </div>
                     </div>
 
                     ${!isTaco ? `
                     <div>
                         <label style="font-size:0.7rem; font-weight:bold; color:#888;">CATEGORÍA:</label>
-                        <select id="ed-c" style="width:100%; padding:15px; border-radius:12px; border:1px solid #ddd; background:white;">
+                        <select id="ed-c" style="width:100%; padding:15px; border-radius:12px; border:1px solid #ddd; background:white;" onchange="router._refreshEditorVariants(this.value)">
                             ${db.categorias.map(c => `<option value="${c}" ${p?.categoria===c?'selected':''}>${c}</option>`).join('')}
                         </select>
                     </div>
@@ -793,18 +794,25 @@ const router = {
                 </div>
 
                 <div id="ed-variants-area" style="display:${p?.requiereCarne?'block':'none'}; background:#f8f9fa; padding:20px; border-radius:18px; margin-bottom:20px; border:1px solid #eee;">
-                    <h4 style="margin:0 0 15px; font-size:0.8rem; letter-spacing:1px; color:#555; border-bottom:1px solid #ddd; padding-bottom:8px;">COSTOS EXTRA POR CARNE PREMIUM</h4>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-                        ${db.carnes.filter(c => c.premium).map(c => `
-                            <div>
-                                <label style="font-size:0.6rem; font-weight:bold; display:block; margin-bottom:4px;">${c.nombre}:</label>
-                                <input type="number" class="ed-var-meat" data-id="${c.id}" value="${v[c.id] || 0}" placeholder="+ 0" style="width:100%; padding:10px; border-radius:10px; border:1px solid #ddd;">
+                    <div id="ed-vars-dynamic">
+                        ${isOrden ? `
+                            <label style="font-size:0.7rem; font-weight:bold; color:#888;">COSTO EXTRA SI LLEVA PREMIUM (+ $):</label>
+                            <input type="number" id="ed-var-premium-orden" value="${v['extra_premium'] || 30}" style="width:100%; padding:15px; border-radius:12px; border:1px solid #ddd; margin-top:5px;">
+                        ` : `
+                            <h4 style="margin:0 0 15px; font-size:0.8rem; letter-spacing:1px; color:#555; border-bottom:1px solid #ddd; padding-bottom:8px;">COSTOS EXTRA POR CARNE PREMIUM</h4>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                                ${db.carnes.filter(c => c.premium).map(c => `
+                                    <div>
+                                        <label style="font-size:0.6rem; font-weight:bold; display:block; margin-bottom:4px;">${c.nombre}:</label>
+                                        <input type="number" class="ed-var-meat" data-id="${c.id}" value="${v[c.id] || 0}" placeholder="+ 0" style="width:100%; padding:10px; border-radius:10px; border:1px solid #ddd;">
+                                    </div>
+                                `).join('')}
                             </div>
-                        `).join('')}
+                        `}
                     </div>
                     ${p?.nombre.toLowerCase().includes('lonche') || p?.categoria === 'Especialidades' ? `
-                    <div style="margin-top:20px; border-top:2px dashed #ddd; padding-top:15px;">
-                        <label style="font-size:0.65rem; font-weight:bold; display:block; margin-bottom:4px;">🧀 EXTRA QUESO (+$):</label>
+                    <div id="ed-queso-area" style="margin-top:20px; border-top:2px dashed #ddd; padding-top:15px;">
+                        <label style="font-size:0.65rem; font-weight:bold; display:block; margin-bottom:4px;"> 🧀 EXTRA QUESO (+$):</label>
                         <input type="number" id="ed-var-queso" value="${v['queso'] || 0}" style="width:100%; padding:12px; border-radius:10px; border:1px solid #ddd;">
                     </div>` : '<input type="hidden" id="ed-var-queso" value="0">'}
                 </div>
@@ -817,19 +825,49 @@ const router = {
         `;
         document.body.appendChild(m);
     },
+
+    _refreshEditorVariants(cat) {
+        const area = document.getElementById('ed-vars-dynamic');
+        const quesoArea = document.getElementById('ed-queso-area');
+        if (cat === 'Ordenes') {
+            area.innerHTML = `
+                <label style="font-size:0.7rem; font-weight:bold; color:#888;">COSTO EXTRA SI LLEVA PREMIUM (+ $):</label>
+                <input type="number" id="ed-var-premium-orden" value="30" style="width:100%; padding:15px; border-radius:12px; border:1px solid #ddd; margin-top:5px;">
+            `;
+            if (quesoArea) quesoArea.style.display = 'none';
+        } else {
+            area.innerHTML = `
+                <h4 style="margin:0 0 15px; font-size:0.8rem; letter-spacing:1px; color:#555; border-bottom:1px solid #ddd; padding-bottom:8px;">COSTOS EXTRA POR CARNE PREMIUM</h4>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                    ${db.carnes.filter(c => c.premium).map(c => `
+                        <div>
+                            <label style="font-size:0.6rem; font-weight:bold; display:block; margin-bottom:4px;">${c.nombre}:</label>
+                            <input type="number" class="ed-var-meat" data-id="${c.id}" value="0" placeholder="+ 0" style="width:100%; padding:10px; border-radius:10px; border:1px solid #ddd;">
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            if (quesoArea) quesoArea.style.display = 'block';
+        }
+    },
+
     async handleSaveProduct(id) { 
         const current = id ? db.productos.find(x => x.id === id) : null;
         const variantes = {};
         document.querySelectorAll('.ed-var-meat').forEach(input => {
             variantes[input.dataset.id] = parseFloat(input.value) || 0;
         });
-        variantes['queso'] = parseFloat(document.getElementById('ed-var-queso').value) || 0;
+        const quesoEl = document.getElementById('ed-var-queso');
+        variantes['queso'] = quesoEl ? parseFloat(quesoEl.value) || 0 : 0;
+        
+        const ordenPremEl = document.getElementById('ed-var-premium-orden');
+        if (ordenPremEl) variantes['extra_premium'] = parseFloat(ordenPremEl.value) || 0;
 
         const pr = { 
             id, 
             nombre: document.getElementById('ed-n').value, 
             precio: parseFloat(document.getElementById('ed-p').value), 
-            precioSencillo: parseFloat(document.getElementById('ed-ps').value) || 0,
+            precioSencillo: parseFloat(document.getElementById('ed-ps')?.value || 0) || 0,
             categoria: document.getElementById('ed-c').value, 
             requiereCarne: document.getElementById('ed-sk').checked,
             variantes: variantes,

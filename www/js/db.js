@@ -68,14 +68,16 @@ const db = {
             CREATE TABLE IF NOT EXISTS carnes (id TEXT PRIMARY KEY, nombre TEXT, abreviatura TEXT, disponible INTEGER, premium INTEGER, exclusivaTaco INTEGER);
             CREATE TABLE IF NOT EXISTS mesas (id INTEGER PRIMARY KEY, numero TEXT, x REAL, y REAL, ancho REAL, alto REAL, forma TEXT, estado TEXT);
             CREATE TABLE IF NOT EXISTS empleados (id INTEGER PRIMARY KEY, nombre TEXT, puesto TEXT, pago_dia REAL, pin TEXT);
-            CREATE TABLE IF NOT EXISTS turnos (id INTEGER PRIMARY KEY, fecha TEXT, hora_inicio TEXT, hora_fin TEXT, inicioCaja REAL, ventas REAL, gastos REAL, retiros REAL, estado TEXT);
+            CREATE TABLE IF NOT EXISTS turnos (id INTEGER PRIMARY KEY, fecha TEXT, hora_inicio TEXT, hora_fin TEXT, inicioCaja REAL, ventas REAL, ventas_efectivo REAL DEFAULT 0, gastos REAL, retiros REAL, estado TEXT);
             CREATE TABLE IF NOT EXISTS gastos (id INTEGER PRIMARY KEY, descripcion TEXT, monto REAL, fecha TEXT, hora TEXT, estado TEXT);
             CREATE TABLE IF NOT EXISTS logs_auditoria (id INTEGER PRIMARY KEY, usuario TEXT, accion TEXT, detalles TEXT, fecha TEXT, hora TEXT);
             CREATE TABLE IF NOT EXISTS pedidos (id INTEGER PRIMARY KEY, tipo TEXT, mesaId INTEGER, mesaNumero TEXT, cliente TEXT, platos TEXT, total REAL, metodo_pago TEXT, estado TEXT, fecha TEXT, fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP, descuento REAL DEFAULT 0, fiar_a TEXT);
         `;
         await this.dbConn.execute(schema);
         
-        // Verificación inteligente: Si no existe la categoría 'Ordenes', forzar seed parcial
+        // Migración automática para ventas_efectivo
+        try { await this.dbConn.execute("ALTER TABLE turnos ADD COLUMN ventas_efectivo REAL DEFAULT 0;"); } catch(e){}
+
         const checkCat = await this.dbConn.query("SELECT count(*) as count FROM categorias WHERE nombre = 'Ordenes'");
         if (checkCat.values[0].count === 0) {
             console.log("DB: Detectada falta de categorías base, ejecutando seed...");
@@ -178,23 +180,11 @@ const db = {
         this.carnes = [
             {id:'pastor', nombre:'Pastor', abreviatura:'PAS', disponible:true, premium:false},
             {id:'suadero', nombre:'Suadero', abreviatura:'SUA', disponible:true, premium:false},
-            {id:'chorizo', nombre:'Chorizo', abreviatura:'CHO', disponible:true, premium:false},
-            {id:'bistec', nombre:'Bistec', abreviatura:'BIS', disponible:true, premium:false},
-            {id:'cabeza', nombre:'Cabeza', abreviatura:'CAB', disponible:true, premium:false},
-            {id:'carnaza', nombre:'Carnaza', abreviatura:'CAR', disponible:true, premium:false},
-            {id:'ojo', nombre:'Ojo', abreviatura:'OJO', disponible:true, premium:false},
-            {id:'arrachera', nombre:'Arrachera', abreviatura:'ARR', disponible:true, premium:true},
-            {id:'tripa', nombre:'Tripa', abreviatura:'TRI', disponible:true, premium:true},
-            {id:'lengua', nombre:'Lengua', abreviatura:'LEN', disponible:true, premium:true},
-            {id:'labio', nombre:'Labio', abreviatura:'LAB', disponible:true, premium:true}
+            {id:'arrachera', nombre:'Arrachera', abreviatura:'ARR', disponible:true, premium:true}
         ];
         this.productos = [
             {id:1, nombre:'Taco Pastor', categoria:'Tacos', abreviatura:'T_PAS', precio:18, requiereCarne:false, agotado:false, stock:0},
             {id:2, nombre:'Taco Suadero', categoria:'Tacos', abreviatura:'T_SUA', precio:18, requiereCarne:false, agotado:false, stock:0},
-            {id:3, nombre:'Taco Chorizo', categoria:'Tacos', abreviatura:'T_CHO', precio:18, requiereCarne:false, agotado:false, stock:0},
-            {id:4, nombre:'Taco Bistec', categoria:'Tacos', abreviatura:'T_BIS', precio:18, requiereCarne:false, agotado:false, stock:0},
-            {id:5, nombre:'Taco Cabeza', categoria:'Tacos', abreviatura:'T_CAB', precio:18, requiereCarne:false, agotado:false, stock:0},
-            {id:8, nombre:'Taco Arrachera', categoria:'Tacos', abreviatura:'T_ARR', precio:25, requiereCarne:false, agotado:false, stock:0},
             {id:20, nombre:'Quesadilla', categoria:'Especialidades', abreviatura:'QUESA', precio:35, requiereCarne:true, precioSencillo:25, agotado:false, stock:0, variantes:{}},
             {id:30, nombre:'Orden Chica', categoria:'Ordenes', abreviatura:'O_CHI', precio:160, requiereCarne:true, agotado:false, stock:0}
         ];
@@ -624,7 +614,8 @@ const db = {
             
             // Actualizar turno actual si existe
             if (this.turnoActual) {
-                await this.dbConn.run("UPDATE turnos SET ventas = ventas + ? WHERE id=?", [total, this.turnoActual.id]);
+                const addEfectivo = (metodo === 'efectivo') ? total : 0;
+                await this.dbConn.run("UPDATE turnos SET ventas = ventas + ?, ventas_efectivo = ventas_efectivo + ? WHERE id=?", [total, addEfectivo, this.turnoActual.id]);
                 // RECARGA CRÍTICA DEL TURNO
                 const tRes = await this.dbConn.query("SELECT * FROM turnos WHERE id = ?", [this.turnoActual.id]);
                 if (tRes.values && tRes.values.length > 0) this.turnoActual = tRes.values[0];
@@ -634,7 +625,7 @@ const db = {
             if (typeof router !== 'undefined' && router.updateMonitorBadge) router.updateMonitorBadge();
         }
         this.pedidosActivos = this.pedidosActivos.filter(x => x.id !== id);
-        app.showNotification(metodo === 'fiado' ? "📝 DEUDA REGISTRADA: $" + total.toFixed(2) : "💰 VENTA REGISTRADA: $" + total.toFixed(2));
+        app.showNotification(metodo === 'fiado' ? "📝 DEUDA REGISTRADA" : "💰 VENTA REGISTRADA");
     },
 
     async abrirTurno(monto) {
@@ -642,11 +633,11 @@ const db = {
         const h = new Date().toLocaleTimeString();
         const m = parseFloat(monto) || 0;
         if (this.dbConn) {
-            const res = await this.dbConn.run("INSERT INTO turnos (fecha, hora_inicio, inicioCaja, ventas, gastos, retiros, estado) VALUES (?,?,?,?,?,?,?)", [hoy, h, m, 0, 0, 0, 'abierto']);
-            this.turnoActual = { id: res.changes.lastId, fecha: hoy, hora_inicio: h, inicioCaja: m, ventas: 0, gastos: 0, retiros: 0, estado: 'abierto' };
+            const res = await this.dbConn.run("INSERT INTO turnos (fecha, hora_inicio, inicioCaja, ventas, ventas_efectivo, gastos, retiros, estado) VALUES (?,?,?,?,?,?,?,?)", [hoy, h, m, 0, 0, 0, 0, 'abierto']);
+            this.turnoActual = { id: res.changes.lastId, fecha: hoy, hora_inicio: h, inicioCaja: m, ventas: 0, ventas_efectivo: 0, gastos: 0, retiros: 0, estado: 'abierto' };
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         } else {
-            this.turnoActual = { id: Date.now(), fecha: hoy, hora_inicio: h, inicioCaja: m, ventas: 0, gastos: 0, retiros: 0, estado: 'abierto' };
+            this.turnoActual = { id: Date.now(), fecha: hoy, hora_inicio: h, inicioCaja: m, ventas: 0, ventas_efectivo: 0, gastos: 0, retiros: 0, estado: 'abierto' };
         }
         await this.addLog('APERTURA', `Fondo Inicial: ${m}`);
     },
@@ -657,7 +648,7 @@ const db = {
         const mR = parseFloat(montoReal) || 0;
         if (this.dbConn) {
             await this.dbConn.run("UPDATE turnos SET estado='cerrado', hora_fin=? WHERE id=?", [h, this.turnoActual.id]);
-            await this.addLog('CORTE', `Caja Final: ${mR}, Esperado: ${this.turnoActual.inicioCaja + this.turnoActual.ventas - this.turnoActual.gastos - this.turnoActual.retiros}`);
+            await this.addLog('CORTE', `Caja Final: ${mR}, Esperado: ${this.turnoActual.inicioCaja + this.turnoActual.ventas_efectivo - this.turnoActual.gastos - this.turnoActual.retiros}`);
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
         this.turnoActual = null;
