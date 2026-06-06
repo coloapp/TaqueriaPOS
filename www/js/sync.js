@@ -82,10 +82,14 @@ const sync = {
                 try {
                     const p = JSON.parse(req.body);
                     await db.guardarPedido(p);
-                    // Notificar si estamos en la vista de cocina o caja
-                    const view = document.getElementById('content').dataset.view;
-                    if (view === 'cocina') router.renderCocina();
-                    if (view === 'caja') router.renderCaja();
+                    
+                    // Automatizar badge y refrescar vistas si están abiertas
+                    if (typeof router !== 'undefined') {
+                        router.updateMonitorBadge();
+                        const view = document.getElementById('content').dataset.view;
+                        if (view === 'cocina') router.renderCocina();
+                        if (view === 'caja') router.renderCaja();
+                    }
                     
                     webserver.sendResponse(req.requestId, { 
                         status: 200, 

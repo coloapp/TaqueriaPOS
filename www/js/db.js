@@ -405,19 +405,32 @@ const db = {
 
     async getReporteGeneral(periodo = 'hoy') {
         if (!this.dbConn) return { ventas: 0, totalGastos: 0, totalDescuentos: 0, deudas: [], lista: [] };
+        
         let query = "SELECT * FROM pedidos WHERE (estado='pagado' OR estado='deuda')";
-        if (periodo === 'hoy') query += " AND fecha = '" + new Date().toLocaleDateString() + "'";
+        const hoy = new Date().toLocaleDateString();
+        
         const res = await this.dbConn.query(query + " ORDER BY id DESC");
-        const lista = (res.values || []).map(p => ({ ...p, platos: JSON.parse(p.platos) }));
+        let lista = (res.values || []).map(p => ({ 
+            ...p, 
+            platos: JSON.parse(p.platos),
+            cliente: JSON.parse(p.cliente || '{}')
+        }));
+        
+        if (periodo === 'hoy') {
+            lista = lista.filter(p => p.fecha === hoy);
+        }
         
         const ventas = lista.reduce((a, b) => a + b.total, 0);
         const totalDescuentos = lista.reduce((a, b) => a + (b.descuento || 0), 0);
         const deudas = lista.filter(p => p.estado === 'deuda');
         
-        let gQuery = "SELECT SUM(monto) as total FROM gastos WHERE estado='pagado'";
-        if (periodo === 'hoy') gQuery += " AND fecha = '" + new Date().toLocaleDateString() + "'";
+        let gQuery = "SELECT * FROM gastos WHERE estado='pagado'";
         const gRes = await this.dbConn.query(gQuery);
-        const totalGastos = gRes.values[0].total || 0;
+        let gastosLista = gRes.values || [];
+        if (periodo === 'hoy') {
+            gastosLista = gastosLista.filter(g => g.fecha === hoy);
+        }
+        const totalGastos = gastosLista.reduce((a, b) => a + b.monto, 0);
         
         return { ventas, totalGastos, totalDescuentos, deudas, lista };
     },
@@ -474,6 +487,8 @@ const db = {
                 await this.dbConn.run("INSERT INTO pedidos (id, tipo, mesaId, mesaNumero, cliente, platos, total, estado, fecha, descuento, fiar_a) VALUES (?,?,?,?,?,?,?,?,?,?,?)", [p.id, p.tipo, p.mesaId, p.mesaNumero, cStr, pStr, total, p.estado, new Date().toLocaleDateString(), p.descuento || 0, p.fiar_a || null]);
             }
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
+            // Automatizar badge
+            if (typeof router !== 'undefined' && router.updateMonitorBadge) router.updateMonitorBadge();
         }
         const idx = this.pedidosActivos.findIndex(x => x.id === p.id);
         if (idx === -1) this.pedidosActivos.push({ ...p, total });
@@ -523,6 +538,8 @@ const db = {
         if (this.dbConn) {
             await this.dbConn.run("UPDATE pedidos SET estado=? WHERE id=?", [estado, id]);
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
+            // Automatizar badge
+            if (typeof router !== 'undefined' && router.updateMonitorBadge) router.updateMonitorBadge();
         }
         const p = this.pedidosActivos.find(x => x.id === id);
         if (p) p.estado = estado;
@@ -533,7 +550,7 @@ const db = {
         if (this.dbConn) {
             const f = new Date().toLocaleDateString();
             const h = new Date().toLocaleTimeString();
-            const u = router.currentUser ? router.currentUser.nombre : 'SISTEMA';
+            const u = (typeof router !== 'undefined' && router.currentUser) ? router.currentUser.nombre : 'SISTEMA';
             await this.dbConn.run("INSERT INTO logs_auditoria (usuario, accion, detalles, fecha, hora) VALUES (?,?,?,?,?)", [u, accion, detalles, f, h]);
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
@@ -549,11 +566,17 @@ const db = {
 
         if (this.dbConn) {
             await this.dbConn.run("UPDATE pedidos SET estado=?, metodo_pago=?, total=?, fiar_a=? WHERE id=?", [p.estado, metodo, total, p.fiar_a || null, id]);
+            
+            // Actualizar turno actual si existe
             if (this.turnoActual) {
                 await this.dbConn.run("UPDATE turnos SET ventas = ventas + ? WHERE id=?", [total, this.turnoActual.id]);
-                this.turnoActual.ventas += total;
+                // RECARGA CRÍTICA DEL TURNO
+                const tRes = await this.dbConn.query("SELECT * FROM turnos WHERE id = ?", [this.turnoActual.id]);
+                if (tRes.values && tRes.values.length > 0) this.turnoActual = tRes.values[0];
             }
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
+            // Automatizar badge
+            if (typeof router !== 'undefined' && router.updateMonitorBadge) router.updateMonitorBadge();
         }
         this.pedidosActivos = this.pedidosActivos.filter(x => x.id !== id);
         app.showNotification(metodo === 'fiado' ? "📝 DEUDA REGISTRADA: $" + total.toFixed(2) : "💰 VENTA REGISTRADA: $" + total.toFixed(2));
@@ -589,7 +612,10 @@ const db = {
         const m = parseFloat(monto) || 0;
         if (this.dbConn && this.turnoActual) {
             await this.dbConn.run("UPDATE turnos SET retiros = retiros + ? WHERE id=?", [m, this.turnoActual.id]);
-            this.turnoActual.retiros += m;
+            // RECARGA CRÍTICA DEL TURNO
+            const tRes = await this.dbConn.query("SELECT * FROM turnos WHERE id = ?", [this.turnoActual.id]);
+            if (tRes.values && tRes.values.length > 0) this.turnoActual = tRes.values[0];
+
             await this.addLog('RETIRO', `Monto: ${m}, Motivo: ${desc}`);
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
