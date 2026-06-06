@@ -689,8 +689,8 @@ const router = {
                         <div style="display:flex; justify-content:space-between; align-items:start;">
                             <div style="font-size:0.7rem; color:#888;">#${p.id}</div>
                             <div style="position:relative;">
-                                <span style="cursor:pointer; font-size:1.2rem; padding:0 5px;" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">⋮</span>
-                                <div style="display:none; position:absolute; right:0; top:20px; background:white; box-shadow:var(--shadow); border-radius:8px; z-index:100; min-width:120px;">
+                                <span class="dropdown-trigger" style="cursor:pointer; font-size:1.2rem; padding:0 5px;" onclick="router.toggleProductDropdown(this)">⋮</span>
+                                <div class="dropdown-content" style="display:none; position:absolute; right:0; top:20px; background:white; box-shadow:var(--shadow); border-radius:8px; z-index:100; min-width:120px;">
                                     <div style="padding:12px; cursor:pointer; border-bottom:1px solid #eee;" onclick="router.showProductCard(${JSON.stringify(p).replace(/"/g, '&quot;')})">✏️ Editar</div>
                                     <div style="padding:12px; cursor:pointer; color:red;" onclick="router.handleDeleteProduct(${p.id}, '${cat}')">🗑️ Eliminar</div>
                                 </div>
@@ -913,5 +913,29 @@ const router = {
             </div>
         `;
     },
-    async handleToggleCarne(id) { await db.toggleCarne(id); this.renderAdminCarnes(); }
+    async handleToggleCarne(id) { await db.toggleCarne(id); this.renderAdminCarnes(); },
+
+    async handleDeleteProduct(id, cat) {
+        if (confirm("¿Estás seguro de eliminar este producto definitivamente?")) {
+            await db.deleteProducto(id);
+            this.refreshAdminCatalog(cat);
+            app.showNotification("🗑️ Producto eliminado");
+        }
+    },
+
+    toggleProductDropdown(el) {
+        const isOpen = el.nextElementSibling.style.display === 'block';
+        // Cerrar todos los demás primero
+        document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
+        // Abrir el actual si estaba cerrado
+        if (!isOpen) el.nextElementSibling.style.display = 'block';
+    }
     };
+
+// Listener global para cerrar dropdowns al hacer click fuera
+document.addEventListener('click', (e) => {
+    if (!e.target.matches('.dropdown-trigger')) {
+        document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
+    }
+});
+
