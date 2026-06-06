@@ -74,30 +74,30 @@ const db = {
             CREATE TABLE IF NOT EXISTS pedidos (id INTEGER PRIMARY KEY, tipo TEXT, mesaId INTEGER, mesaNumero TEXT, cliente TEXT, platos TEXT, total REAL, metodo_pago TEXT, estado TEXT, fecha TEXT, fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP, descuento REAL DEFAULT 0, fiar_a TEXT);
         `;
         await this.dbConn.execute(schema);
-        const res = await this.dbConn.query("SELECT count(*) as count FROM productos");
-        if (res.values[0].count === 0) await this.seedData();
+        
+        // Verificación inteligente: Si no existe la categoría 'Ordenes', forzar seed parcial
+        const checkCat = await this.dbConn.query("SELECT count(*) as count FROM categorias WHERE nombre = 'Ordenes'");
+        if (checkCat.values[0].count === 0) {
+            console.log("DB: Detectada falta de categorías base, ejecutando seed...");
+            await this.seedData();
+        }
+        
         if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
     },
 
     async seedData() {
-        const hoy = this.getToday();
         const seed = `
-            INSERT INTO categorias (id, nombre) VALUES (1, 'Tacos'), (2, 'Especialidades'), (3, 'Ordenes'), (4, 'Bebidas'), (5, 'Postres');
+            INSERT OR IGNORE INTO categorias (id, nombre) VALUES (1, 'Tacos'), (2, 'Especialidades'), (3, 'Ordenes'), (4, 'Bebidas'), (5, 'Postres');
             
-            INSERT INTO carnes (id, nombre, abreviatura, disponible, premium) VALUES 
-            ('pastor', 'Pastor', 'PAS', 1, 0), 
-            ('suadero', 'Suadero', 'SUA', 1, 0), 
-            ('chorizo', 'Chorizo', 'CHO', 1, 0),
-            ('bistec', 'Bistec', 'BIS', 1, 0),
-            ('cabeza', 'Cabeza', 'CAB', 1, 0),
-            ('carnaza', 'Carnaza', 'CAR', 1, 0),
-            ('ojo', 'Ojo', 'OJO', 1, 0),
-            ('arrachera', 'Arrachera', 'ARR', 1, 1), 
-            ('tripa', 'Tripa', 'TRI', 1, 1),
-            ('lengua', 'Lengua', 'LEN', 1, 1), 
+            INSERT OR IGNORE INTO carnes (id, nombre, abreviatura, disponible, premium) VALUES 
+            ('pastor', 'Pastor', 'PAS', 1, 0), ('suadero', 'Suadero', 'SUA', 1, 0), 
+            ('chorizo', 'Chorizo', 'CHO', 1, 0), ('bistec', 'Bistec', 'BIS', 1, 0),
+            ('cabeza', 'Cabeza', 'CAB', 1, 0), ('carnaza', 'Carnaza', 'CAR', 1, 0),
+            ('ojo', 'Ojo', 'OJO', 1, 0), ('arrachera', 'Arrachera', 'ARR', 1, 1), 
+            ('tripa', 'Tripa', 'TRI', 1, 1), ('lengua', 'Lengua', 'LEN', 1, 1), 
             ('labio', 'Labio', 'LAB', 1, 1);
 
-            INSERT INTO productos (id, categoria_id, nombre, abreviatura, precio, requiereCarne, precioSencillo) VALUES 
+            INSERT OR IGNORE INTO productos (id, categoria_id, nombre, abreviatura, precio, requiereCarne, precioSencillo) VALUES 
             (1, 1, 'Taco Pastor', 'T_PAS', 18, 0, 0),
             (2, 1, 'Taco Suadero', 'T_SUA', 18, 0, 0),
             (3, 1, 'Taco Chorizo', 'T_CHO', 18, 0, 0),
@@ -118,7 +118,7 @@ const db = {
             (40, 4, 'Refresco 500ml', 'REF', 25, 0, 0),
             (41, 4, 'Agua 1L', 'AGU', 35, 0, 0);
 
-            INSERT INTO mesas (id, numero, x, y, estado, ancho, alto, forma) VALUES 
+            INSERT OR IGNORE INTO mesas (id, numero, x, y, estado, ancho, alto, forma) VALUES 
             (1, '1', 50, 50, 'libre', 70, 70, 'cuadrada'),
             (2, '2', 150, 50, 'libre', 70, 70, 'cuadrada');
         `;
@@ -143,7 +143,7 @@ const db = {
                 })()
             }));
             const carRes = await this.dbConn.query("SELECT * FROM carnes");
-            this.carnes = (carRes.values || []).map(c => ({ ...c, disponible: !!c.disponible }));
+            this.carnes = (carRes.values || []).map(c => ({ ...c, disponible: !!c.disponible, premium: !!c.premium }));
             const mesaRes = await this.dbConn.query("SELECT * FROM mesas");
             this.mesas = mesaRes.values || [];
             const turRes = await this.dbConn.query("SELECT * FROM turnos ORDER BY id DESC");
@@ -174,14 +174,29 @@ const db = {
     },
 
     loadMockData() {
-        this.categorias = ['Tacos', 'Especialidades', 'Bebidas'];
-        this.productos = [
-            {id:1, nombre:'Taco Pastor', categoria:'Tacos', precio:18, requiereCarne:true, agotado:false, stock:0, variantes:{}},
-            {id:7, nombre:'Quesadilla', categoria:'Especialidades', precio:35, requiereCarne:true, precioSencillo:25, agotado:false, stock:0, variantes:{}}
-        ];
+        this.categorias = ['Tacos', 'Especialidades', 'Ordenes', 'Bebidas', 'Postres'];
         this.carnes = [
-            {id:'pastor', nombre:'Pastor', disponible:true, premium:false},
-            {id:'arrachera', nombre:'Arrachera', disponible:true, premium:true}
+            {id:'pastor', nombre:'Pastor', abreviatura:'PAS', disponible:true, premium:false},
+            {id:'suadero', nombre:'Suadero', abreviatura:'SUA', disponible:true, premium:false},
+            {id:'chorizo', nombre:'Chorizo', abreviatura:'CHO', disponible:true, premium:false},
+            {id:'bistec', nombre:'Bistec', abreviatura:'BIS', disponible:true, premium:false},
+            {id:'cabeza', nombre:'Cabeza', abreviatura:'CAB', disponible:true, premium:false},
+            {id:'carnaza', nombre:'Carnaza', abreviatura:'CAR', disponible:true, premium:false},
+            {id:'ojo', nombre:'Ojo', abreviatura:'OJO', disponible:true, premium:false},
+            {id:'arrachera', nombre:'Arrachera', abreviatura:'ARR', disponible:true, premium:true},
+            {id:'tripa', nombre:'Tripa', abreviatura:'TRI', disponible:true, premium:true},
+            {id:'lengua', nombre:'Lengua', abreviatura:'LEN', disponible:true, premium:true},
+            {id:'labio', nombre:'Labio', abreviatura:'LAB', disponible:true, premium:true}
+        ];
+        this.productos = [
+            {id:1, nombre:'Taco Pastor', categoria:'Tacos', abreviatura:'T_PAS', precio:18, requiereCarne:false, agotado:false, stock:0},
+            {id:2, nombre:'Taco Suadero', categoria:'Tacos', abreviatura:'T_SUA', precio:18, requiereCarne:false, agotado:false, stock:0},
+            {id:3, nombre:'Taco Chorizo', categoria:'Tacos', abreviatura:'T_CHO', precio:18, requiereCarne:false, agotado:false, stock:0},
+            {id:4, nombre:'Taco Bistec', categoria:'Tacos', abreviatura:'T_BIS', precio:18, requiereCarne:false, agotado:false, stock:0},
+            {id:5, nombre:'Taco Cabeza', categoria:'Tacos', abreviatura:'T_CAB', precio:18, requiereCarne:false, agotado:false, stock:0},
+            {id:8, nombre:'Taco Arrachera', categoria:'Tacos', abreviatura:'T_ARR', precio:25, requiereCarne:false, agotado:false, stock:0},
+            {id:20, nombre:'Quesadilla', categoria:'Especialidades', abreviatura:'QUESA', precio:35, requiereCarne:true, precioSencillo:25, agotado:false, stock:0, variantes:{}},
+            {id:30, nombre:'Orden Chica', categoria:'Ordenes', abreviatura:'O_CHI', precio:160, requiereCarne:true, agotado:false, stock:0}
         ];
         this.mesas = [{id:1, numero:'1', x:50, y:50, ancho:70, alto:70, forma:'cuadrada'}];
         this.pedidosActivos = [];
@@ -190,6 +205,19 @@ const db = {
     async save() {
         localStorage.setItem('tpos_config', JSON.stringify(this.config));
         if (this.dbConn && typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
+    },
+
+    async hardReset() {
+        if (!this.dbConn) {
+            localStorage.clear();
+            location.reload();
+            return;
+        }
+        try {
+            await this.dbConn.execute("DROP TABLE IF EXISTS categorias; DROP TABLE IF EXISTS productos; DROP TABLE IF EXISTS carnes; DROP TABLE IF EXISTS mesas; DROP TABLE IF EXISTS empleados; DROP TABLE IF EXISTS turnos; DROP TABLE IF EXISTS gastos; DROP TABLE IF EXISTS logs_auditoria; DROP TABLE IF EXISTS pedidos;");
+            localStorage.clear();
+            location.reload();
+        } catch(e) { console.error(e); }
     },
 
     async verificarActivacion(codigo) {

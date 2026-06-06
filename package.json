@@ -1,6 +1,6 @@
 {
   "name": "taqueriapos",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "Sistema de gestión para taquería offline.",
   "main": "load_context.js",
   "scripts": {
