@@ -182,7 +182,7 @@ const router = {
         grid.innerHTML = prods.map(p => `
             <div class="product-card ${p.agotado ? 'sold-out' : ''}" onclick="${p.agotado ? '' : `router.addToOrder(${JSON.stringify(p).replace(/"/g, '&quot;')})`}">
                 ${p.agotado ? '<div class="sold-out-badge">AGOTADO</div>' : ''}
-                <div class="prod-code">${p.abreviatura || p.nombre.substring(0,3).toUpperCase()}</div>
+                <div class="prod-code">${p.abreviatura || p.nombre.substring(0,5).toUpperCase()}</div>
                 <div class="prod-price">$${p.precio}</div>
                 <div class="prod-name">${p.nombre.toUpperCase()}</div>
             </div>

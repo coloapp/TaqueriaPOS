@@ -126,6 +126,7 @@ const db = {
                 requiereCarne: !!p.requiereCarne,
                 agotado: !!p.agotado,
                 stock: p.stock || 0,
+                abreviatura: p.abreviatura || p.nombre.substring(0,5).toUpperCase(),
                 variantes: (() => {
                     try { return p.variantes ? JSON.parse(p.variantes) : {}; }
                     catch(e) { return {}; }
@@ -152,6 +153,14 @@ const db = {
             }));
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         } catch (e) { console.error("Error Carga:", e); }
+    },
+
+    getToday() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
     },
 
     loadMockData() {
@@ -299,12 +308,13 @@ const db = {
         
         // Auto-crear Taco de esta carne en categoría Tacos
         const precio = c.premium ? 25 : 18;
+        const abrev = 'T_' + c.id.substring(0,3).toUpperCase();
         await this.addProducto({
             nombre: `Taco de ${c.nombre}`,
             precio: precio,
             categoria: 'Tacos',
             requiereCarne: false, // Tacos de carne fija no requieren selector
-            abreviatura: 'T_' + c.id.substring(0,3).toUpperCase(),
+            abreviatura: abrev,
             variantes: {}
         });
     },
@@ -338,20 +348,21 @@ const db = {
     },
 
     async addGasto(g) {
-        const f = new Date().toLocaleDateString();
+        const hoy = this.getToday();
         const h = new Date().toLocaleTimeString();
         if (this.dbConn) {
-            const res = await this.dbConn.run("INSERT INTO gastos (descripcion, monto, fecha, hora, estado) VALUES (?,?,?,?,?)", [g.descripcion, g.monto, f, h, g.estado]);
+            const res = await this.dbConn.run("INSERT INTO gastos (descripcion, monto, fecha, hora, estado) VALUES (?,?,?,?,?)", [g.descripcion, g.monto, hoy, h, g.estado]);
             g.id = res.changes.lastId;
             if (g.estado === 'pagado' && this.turnoActual) {
                 await this.dbConn.run("UPDATE turnos SET gastos = gastos + ? WHERE id=?", [g.monto, this.turnoActual.id]);
-                this.turnoActual.gastos += g.monto;
+                const tRes = await this.dbConn.query("SELECT * FROM turnos WHERE id = ?", [this.turnoActual.id]);
+                if (tRes.values && tRes.values.length > 0) this.turnoActual = tRes.values[0];
             }
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         } else {
             g.id = Date.now();
         }
-        g.fecha = f; g.hora = h;
+        g.fecha = hoy; g.hora = h;
         this.gastos.push(g);
         return g;
     },
@@ -364,7 +375,8 @@ const db = {
                 await this.dbConn.run("UPDATE gastos SET estado='pagado' WHERE id=?", [id]);
                 if (this.turnoActual) {
                     await this.dbConn.run("UPDATE turnos SET gastos = gastos + ? WHERE id=?", [g.monto, this.turnoActual.id]);
-                    this.turnoActual.gastos += g.monto;
+                    const tRes = await this.dbConn.query("SELECT * FROM turnos WHERE id = ?", [this.turnoActual.id]);
+                    if (tRes.values && tRes.values.length > 0) this.turnoActual = tRes.values[0];
                 }
                 if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
             }
@@ -407,7 +419,7 @@ const db = {
         if (!this.dbConn) return { ventas: 0, totalGastos: 0, totalDescuentos: 0, deudas: [], lista: [] };
         
         let query = "SELECT * FROM pedidos WHERE (estado='pagado' OR estado='deuda')";
-        const hoy = new Date().toLocaleDateString();
+        const hoy = this.getToday();
         
         const res = await this.dbConn.query(query + " ORDER BY id DESC");
         let lista = (res.values || []).map(p => ({ 
@@ -437,7 +449,8 @@ const db = {
 
     async getMetricasCarnes() {
         if (!this.dbConn) return [];
-        const res = await this.dbConn.query("SELECT platos, total FROM pedidos WHERE (estado='pagado' OR estado='deuda') AND fecha = ?", [new Date().toLocaleDateString()]);
+        const hoy = this.getToday();
+        const res = await this.dbConn.query("SELECT platos, total FROM pedidos WHERE (estado='pagado' OR estado='deuda') AND fecha = ?", [hoy]);
         const metrics = {};
         (res.values || []).forEach(p => {
             const platos = JSON.parse(p.platos);
@@ -479,20 +492,21 @@ const db = {
         const total = this.calcularTotal(p);
         const pStr = JSON.stringify(p.platos);
         const cStr = JSON.stringify(p.cliente);
+        const hoy = this.getToday();
         if (this.dbConn) {
             const check = await this.dbConn.query("SELECT id FROM pedidos WHERE id = ?", [p.id]);
             if (check.values.length > 0) {
                 await this.dbConn.run("UPDATE pedidos SET platos=?, cliente=?, total=?, estado=?, descuento=?, fiar_a=? WHERE id=?", [pStr, cStr, total, p.estado, p.descuento || 0, p.fiar_a || null, p.id]);
             } else {
-                await this.dbConn.run("INSERT INTO pedidos (id, tipo, mesaId, mesaNumero, cliente, platos, total, estado, fecha, descuento, fiar_a) VALUES (?,?,?,?,?,?,?,?,?,?,?)", [p.id, p.tipo, p.mesaId, p.mesaNumero, cStr, pStr, total, p.estado, new Date().toLocaleDateString(), p.descuento || 0, p.fiar_a || null]);
+                await this.dbConn.run("INSERT INTO pedidos (id, tipo, mesaId, mesaNumero, cliente, platos, total, estado, fecha, descuento, fiar_a) VALUES (?,?,?,?,?,?,?,?,?,?,?)", [p.id, p.tipo, p.mesaId, p.mesaNumero, cStr, pStr, total, p.estado, hoy, p.descuento || 0, p.fiar_a || null]);
             }
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
             // Automatizar badge
             if (typeof router !== 'undefined' && router.updateMonitorBadge) router.updateMonitorBadge();
         }
         const idx = this.pedidosActivos.findIndex(x => x.id === p.id);
-        if (idx === -1) this.pedidosActivos.push({ ...p, total });
-        else this.pedidosActivos[idx] = { ...p, total };
+        if (idx === -1) this.pedidosActivos.push({ ...p, total, fecha: hoy });
+        else this.pedidosActivos[idx] = { ...p, total, fecha: hoy };
     },
 
     calcularTotal(p, conComision = false) {
@@ -548,10 +562,10 @@ const db = {
 
     async addLog(accion, detalles) {
         if (this.dbConn) {
-            const f = new Date().toLocaleDateString();
+            const hoy = this.getToday();
             const h = new Date().toLocaleTimeString();
             const u = (typeof router !== 'undefined' && router.currentUser) ? router.currentUser.nombre : 'SISTEMA';
-            await this.dbConn.run("INSERT INTO logs_auditoria (usuario, accion, detalles, fecha, hora) VALUES (?,?,?,?,?)", [u, accion, detalles, f, h]);
+            await this.dbConn.run("INSERT INTO logs_auditoria (usuario, accion, detalles, fecha, hora) VALUES (?,?,?,?,?)", [u, accion, detalles, hoy, h]);
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         }
     },
@@ -583,15 +597,15 @@ const db = {
     },
 
     async abrirTurno(monto) {
-        const f = new Date().toLocaleDateString();
+        const hoy = this.getToday();
         const h = new Date().toLocaleTimeString();
         const m = parseFloat(monto) || 0;
         if (this.dbConn) {
-            const res = await this.dbConn.run("INSERT INTO turnos (fecha, hora_inicio, inicioCaja, ventas, gastos, retiros, estado) VALUES (?,?,?,?,?,?,?)", [f, h, m, 0, 0, 0, 'abierto']);
-            this.turnoActual = { id: res.changes.lastId, fecha: f, hora_inicio: h, inicioCaja: m, ventas: 0, gastos: 0, retiros: 0, estado: 'abierto' };
+            const res = await this.dbConn.run("INSERT INTO turnos (fecha, hora_inicio, inicioCaja, ventas, gastos, retiros, estado) VALUES (?,?,?,?,?,?,?)", [hoy, h, m, 0, 0, 0, 'abierto']);
+            this.turnoActual = { id: res.changes.lastId, fecha: hoy, hora_inicio: h, inicioCaja: m, ventas: 0, gastos: 0, retiros: 0, estado: 'abierto' };
             if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
         } else {
-            this.turnoActual = { id: Date.now(), fecha: f, hora_inicio: h, inicioCaja: m, ventas: 0, gastos: 0, retiros: 0, estado: 'abierto' };
+            this.turnoActual = { id: Date.now(), fecha: hoy, hora_inicio: h, inicioCaja: m, ventas: 0, gastos: 0, retiros: 0, estado: 'abierto' };
         }
         await this.addLog('APERTURA', `Fondo Inicial: ${m}`);
     },
