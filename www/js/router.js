@@ -324,7 +324,6 @@ const router = {
         if (existing) existing.cantidad++; else plato.items.push(item);
         document.querySelectorAll('.modal-full').forEach(m => m.remove());
         this.refreshOrderList(); 
-        this.updateQuickActionsUI();
         app.showNotification(`+ ${prod.nombre}`);
     },
 
@@ -355,7 +354,16 @@ const router = {
         container.innerHTML = this.ordenActual.platos.map((pl, idx) => `
             <div class="plato-card ${idx === this.currentPlatoIdx ? 'active' : ''}" onclick="router.selectPlato(${idx})">
                 <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:5px;"><b>PLATO ${idx + 1}</b><span style="color:red;" onclick="event.stopPropagation(); router.eliminarPlatoEspecifico(${idx})">🗑️</span></div>
-                ${pl.items.map((it, i) => `<div style="display:flex; justify-content:space-between; font-size:0.85rem; padding:4px 0; border-bottom:1px solid #eee;"><span><b>${it.cantidad}x</b> ${it.nombre} <small>${it.carneId||''}</small></span><span>$${(it.precio*it.cantidad).toFixed(2)} <span style="color:red;" onclick="event.stopPropagation(); router.eliminarItem(${i})">×</span></span></div>`).join('')}
+                ${pl.items.map((it, i) => {
+                    const code = it.abreviatura || it.nombre.substring(0,5).toUpperCase();
+                    const meatCode = it.carneId ? it.carneId.toUpperCase() : '';
+                    return `
+                        <div style="display:flex; justify-content:space-between; font-size:0.85rem; padding:4px 0; border-bottom:1px solid #eee;">
+                            <span><b>${it.cantidad}x</b> ${code} <small style="color:var(--primary); font-weight:bold;">${meatCode}</small></span>
+                            <span>$${(it.precio*it.cantidad).toFixed(2)} <span style="color:red;" onclick="event.stopPropagation(); router.eliminarItem(${i})">×</span></span>
+                        </div>
+                    `;
+                }).join('')}
                 <div class="plato-switches">
                     <button class="toggle-btn ${pl.sinCebolla?'active':''}" onclick="event.stopPropagation(); router.toggleSwitch(${idx}, 'sinCebolla')">S/ Ceb</button>
                     <button class="toggle-btn ${pl.sinCilantro?'active':''}" onclick="event.stopPropagation(); router.toggleSwitch(${idx}, 'sinCilantro')">S/ Cil</button>
@@ -368,7 +376,7 @@ const router = {
     },
 
     updateTotal() { const t = db.calcularTotal({ ...this.ordenActual, cliente: this.cliente }); document.getElementById('order-total').innerText = `Total: $${t.toFixed(2)}`; },
-    selectPlato(idx) { this.currentPlatoIdx = idx; document.querySelectorAll('.plato-card').forEach((c, i) => c.classList.toggle('active', i === idx)); this.updateQuickActionsUI(); },
+    selectPlato(idx) { this.currentPlatoIdx = idx; document.querySelectorAll('.plato-card').forEach((c, i) => c.classList.toggle('active', i === idx)); },
     updatePlatoNota(idx, val) { this.ordenActual.platos[idx].notas = val; },
     nuevoPlato() { 
         this.ordenActual.platos.push({ items: [], sinCebolla: false, sinCilantro: false, sinVerdura: false, notas: '' }); 
@@ -515,9 +523,35 @@ const router = {
 
     renderCocina() {
         const content = document.getElementById('content');
-        // Filtramos: Solo pendientes Y que no estén pagados
         const pedidos = db.pedidosActivos.filter(p => p.estado === 'pendiente');
-        content.innerHTML = `<div style="padding:15px; height:100%;" class="scrollable-y"><h2>Monitor de Cocina</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:15px;">${pedidos.map(p => `<div class="admin-card" style="border-top:5px solid var(--primary);"><b>${p.tipo==='mesa'?'MESA '+p.mesaNumero:p.tipo.toUpperCase() + ' #' + (p.id % 1000)}</b><br><small>Mesero: ${p.cliente?.mesero || 'Caja'}</small><br>${p.platos.map((pl, i) => `<div style="background:#f9f9f9; padding:8px; margin-top:5px;"><b>P${i+1}</b>: ${pl.items.map(it => it.cantidad+' '+it.nombre).join(', ')}<br><small>${pl.sinCebolla?'S/Ceb':''} ${pl.sinCilantro?'S/Cil':''} ${pl.sinVerdura?'S/Ver':''}</small></div>`).join('')}<button class="btn-primary" style="width:100%; background:#4CAF50; margin-top:10px;" onclick="router.handleOrdenLista(${p.id})">DESPACHAR ✓</button></div>`).join('')}</div></div>`;
+        content.innerHTML = `
+            <div style="padding:15px; height:100%;" class="scrollable-y">
+                <h2>Monitor de Cocina</h2>
+                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:15px;">
+                    ${pedidos.map(p => `
+                        <div class="admin-card" style="border-top:5px solid var(--primary);">
+                            <b>${p.tipo==='mesa'?'MESA '+p.mesaNumero:p.tipo.toUpperCase() + ' #' + (p.id % 1000)}</b><br>
+                            <small>Mesero: ${p.cliente?.mesero || 'Caja'}</small><br>
+                            ${p.platos.map((pl, i) => {
+                                const itemStr = pl.items.map(it => {
+                                    const code = it.abreviatura || it.nombre.substring(0,5).toUpperCase();
+                                    const meat = it.carneId ? '/' + it.carneId.toUpperCase() : '';
+                                    return it.cantidad + ' ' + code + meat;
+                                }).join(', ');
+                                return `
+                                    <div style="background:#f9f9f9; padding:8px; margin-top:5px;">
+                                        <b>P${i+1}</b>: ${itemStr}
+                                        <br><small style="color:red; font-weight:bold;">${pl.sinCebolla?'S/Ceb':''} ${pl.sinCilantro?'S/Cil':''} ${pl.sinVerdura?'S/Ver':''}</small>
+                                        ${pl.notas ? `<br><i style="font-size:0.7rem; color:#666;">"${pl.notas}"</i>` : ''}
+                                    </div>
+                                `;
+                            }).join('')}
+                            <button class="btn-primary" style="width:100%; background:#4CAF50; margin-top:10px;" onclick="router.handleOrdenLista(${p.id})">DESPACHAR ✓</button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
         this.updateMonitorBadge();
     },
 
@@ -938,4 +972,3 @@ document.addEventListener('click', (e) => {
         document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
     }
 });
-

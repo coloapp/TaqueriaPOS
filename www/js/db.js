@@ -80,37 +80,47 @@ const db = {
     },
 
     async seedData() {
+        const hoy = this.getToday();
         const seed = `
-            INSERT INTO categorias (id, nombre) VALUES (1, 'Tacos'), (2, 'Especialidades'), (3, 'Ordenes'), (4, 'Bebidas');
+            INSERT INTO categorias (id, nombre) VALUES (1, 'Tacos'), (2, 'Especialidades'), (3, 'Ordenes'), (4, 'Bebidas'), (5, 'Postres');
             
             INSERT INTO carnes (id, nombre, abreviatura, disponible, premium) VALUES 
-            ('pastor', 'Pastor', 'PAS', 1, 0), ('suadero', 'Suadero', 'SUA', 1, 0), 
-            ('cabeza', 'Cabeza', 'CAB', 1, 0), ('carnaza', 'Carnaza', 'CAR', 1, 0),
-            ('ojo', 'Ojo', 'OJO', 1, 0), ('bistec', 'Bistec', 'BIS', 1, 0), 
+            ('pastor', 'Pastor', 'PAS', 1, 0), 
+            ('suadero', 'Suadero', 'SUA', 1, 0), 
             ('chorizo', 'Chorizo', 'CHO', 1, 0),
-            ('arrachera', 'Arrachera', 'ARR', 1, 1), ('labio', 'Labio', 'LAB', 1, 1),
-            ('lengua', 'Lengua', 'LEN', 1, 1), ('sesos', 'Sesos', 'SES', 1, 1),
-            ('tripa', 'Tripa', 'TRI', 1, 1);
+            ('bistec', 'Bistec', 'BIS', 1, 0),
+            ('cabeza', 'Cabeza', 'CAB', 1, 0),
+            ('carnaza', 'Carnaza', 'CAR', 1, 0),
+            ('ojo', 'Ojo', 'OJO', 1, 0),
+            ('arrachera', 'Arrachera', 'ARR', 1, 1), 
+            ('tripa', 'Tripa', 'TRI', 1, 1),
+            ('lengua', 'Lengua', 'LEN', 1, 1), 
+            ('labio', 'Labio', 'LAB', 1, 1);
 
             INSERT INTO productos (id, categoria_id, nombre, abreviatura, precio, requiereCarne, precioSencillo) VALUES 
-            (1, 1, 'Taco Pastor', 'T_PAS', 18, 1, 0),
-            (2, 1, 'Taco Suadero', 'T_SUA', 18, 1, 0),
-            (3, 1, 'Taco Bistec', 'T_BIS', 18, 1, 0),
-            (7, 2, 'Quesadilla', 'QUESA', 35, 1, 25),
-            (8, 2, 'Gringa', 'GRI', 45, 1, 35),
-            (9, 2, 'Lonche', 'LON', 45, 1, 35),
-            (10, 2, 'Volcan', 'VOL', 35, 1, 25),
-            (11, 2, 'Papa Rellena', 'PAPA', 75, 1, 60),
-            (15, 3, 'Orden Chica', 'O_CHI', 160, 1, 0),
-            (16, 3, 'Orden Grande', 'O_GRA', 220, 1, 0),
-            (20, 4, 'Refresco 500ml', 'REF', 25, 0, 0),
-            (21, 4, 'Agua 1L', 'AGU', 35, 0, 0),
-            (22, 4, 'Agua 0.5L', 'AGU5', 20, 0, 0);
+            (1, 1, 'Taco Pastor', 'T_PAS', 18, 0, 0),
+            (2, 1, 'Taco Suadero', 'T_SUA', 18, 0, 0),
+            (3, 1, 'Taco Chorizo', 'T_CHO', 18, 0, 0),
+            (4, 1, 'Taco Bistec', 'T_BIS', 18, 0, 0),
+            (5, 1, 'Taco Cabeza', 'T_CAB', 18, 0, 0),
+            (6, 1, 'Taco Carnaza', 'T_CAR', 18, 0, 0),
+            (7, 1, 'Taco Ojo', 'T_OJO', 18, 0, 0),
+            (8, 1, 'Taco Arrachera', 'T_ARR', 25, 0, 0),
+            (9, 1, 'Taco Tripa', 'T_TRI', 25, 0, 0),
+            (10, 1, 'Taco Lengua', 'T_LEN', 25, 0, 0),
+            (11, 1, 'Taco Labio', 'T_LAB', 25, 0, 0),
+            (20, 2, 'Quesadilla', 'QUESA', 35, 1, 25),
+            (21, 2, 'Gringa', 'GRI', 45, 1, 35),
+            (22, 2, 'Lonche', 'LON', 45, 1, 35),
+            (23, 2, 'Volcan', 'VOL', 35, 1, 25),
+            (30, 3, 'Orden Chica', 'O_CHI', 160, 1, 0),
+            (31, 3, 'Orden Grande', 'O_GRA', 220, 1, 0),
+            (40, 4, 'Refresco 500ml', 'REF', 25, 0, 0),
+            (41, 4, 'Agua 1L', 'AGU', 35, 0, 0);
 
             INSERT INTO mesas (id, numero, x, y, estado, ancho, alto, forma) VALUES 
             (1, '1', 50, 50, 'libre', 70, 70, 'cuadrada'),
-            (2, '2', 150, 50, 'libre', 70, 70, 'cuadrada'),
-            (3, '3', 250, 50, 'libre', 70, 70, 'redonda');
+            (2, '2', 150, 50, 'libre', 70, 70, 'cuadrada');
         `;
         await this.dbConn.execute(seed);
         if (typeof this.dbConn.saveToStore === 'function') await this.dbConn.saveToStore();
