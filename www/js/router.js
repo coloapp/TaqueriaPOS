@@ -261,22 +261,23 @@ const router = {
         
         m.innerHTML = `
             <div style="background:white; padding:25px; border-radius:20px; width:95%; max-width:480px; text-align:center;">
-                <h2>${prod.nombre.toUpperCase()}</h2>
-                <p>Selecciona hasta ${limit} carnes</p>
-                <div id="selected-list" style="background:#f5f5f5; padding:10px; border-radius:10px; min-height:40px; margin-bottom:15px; font-weight:bold; color:var(--primary);">Ninguna seleccionada</div>
+                <h2 style="margin-bottom:5px;">${prod.nombre.toUpperCase()}</h2>
+                <p style="color:#666; margin-bottom:15px;">Selecciona hasta ${limit} carnes (PROHIBIDO LENGUA)</p>
+                <div id="selected-list" style="background:#f5f5f5; padding:15px; border-radius:12px; min-height:50px; margin-bottom:15px; font-weight:bold; color:var(--primary); display:flex; flex-wrap:wrap; gap:5px; justify-content:center; align-items:center;">Ninguna seleccionada</div>
                 
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; max-height:300px; overflow-y:auto;" class="scrollable-y">
-                    ${db.carnes.filter(c => c.disponible).map(c => `
-                        <button class="btn-secondary meat-opt" data-id="${c.id}" data-premium="${c.premium}" style="padding:10px; font-size:0.8rem;" 
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; max-height:300px; overflow-y:auto; padding:5px;" class="scrollable-y">
+                    ${db.carnes.filter(c => c.disponible && c.id !== 'lengua').map(c => `
+                        <button class="btn-secondary meat-opt" data-id="${c.id}" data-premium="${c.premium}" style="padding:12px 5px; font-size:0.75rem; font-weight:bold; height:60px;" 
                                 onclick="router._toggleMeatSelection(this, '${c.nombre}', ${limit})">
                             ${c.nombre.toUpperCase()}
+                            ${c.premium ? '<br><small style="color:var(--primary);">+EXTRA</small>' : ''}
                         </button>
                     `).join('')}
                 </div>
 
                 <div style="margin-top:20px; display:flex; gap:10px;">
-                    <button class="btn-primary" style="flex:1; padding:15px;" onclick="router._addOrdenToOrder(${JSON.stringify(prod).replace(/"/g, '&quot;')})">AGREGAR ORDEN</button>
-                    <button class="btn-secondary" style="flex:1; padding:15px;" onclick="this.closest('.modal-full').remove()">CANCELAR</button>
+                    <button class="btn-primary" style="flex:1.5; padding:18px; font-weight:900;" onclick="router._addOrdenToOrder(${JSON.stringify(prod).replace(/"/g, '&quot;')})">AGREGAR AL PLATO</button>
+                    <button class="btn-secondary" style="flex:1; padding:18px; background:#f4f4f4; color:#666; border:none;" onclick="this.closest('.modal-full').remove()">CANCELAR</button>
                 </div>
             </div>
         `;

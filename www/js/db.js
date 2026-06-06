@@ -527,8 +527,11 @@ const db = {
                 const v = it.variantes || {};
                 
                 if (it.categoria === 'Ordenes') {
-                    // Lógica para Ordenes: Base + 30 si lleva premium
-                    if (it.isPremiumMeat) pBase += 30;
+                    // Lógica para Ordenes: Base + Extra Premium si lleva alguna carne premium
+                    if (it.isPremiumMeat) {
+                        const extra = parseFloat(v['extra_premium']) || 30;
+                        pBase += extra;
+                    }
                 } else if (it.categoria === 'Especialidades') {
                     if (it.carneId) {
                         const extra = parseFloat(v[it.carneId]) || 0;
