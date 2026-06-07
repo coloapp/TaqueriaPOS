@@ -133,15 +133,30 @@ const router = {
         if (!userStr || !pinStr) { app.showNotification("⚠️ Completa campos"); return; }
         let user = db.empleados.find(e => e.nombre.toLowerCase() === userStr.toLowerCase() && e.pin === pinStr);
         if (!user && userStr.toLowerCase() === 'admin' && db.verificarPin(pinStr, 'admin')) user = { nombre: 'Admin', puesto: 'admin', pin: pinStr };
-        if (user) { this.currentUser = user; app.showNotification(`Bienvenido, ${user.nombre}`); this.navigate('pos'); }
+        if (user) { 
+            this.currentUser = user; 
+            app.showNotification(`Bienvenido, ${user.nombre}`); 
+            app.startUI(sync.role); // Re-render UI for role restrictions
+            this.navigate('pos'); 
+        }
         else { app.showNotification("❌ PIN incorrecto"); }
+    },
+
+    handleLogout() {
+        this.currentUser = null;
+        this.currentMesa = null;
+        this.resetPOS();
+        app.showNotification("Sesión cerrada");
+        app.startUI(sync.role);
+        this.navigate('login');
     },
 
     renderPOS() {
         if (!db.turnoActual && sync.role === 'caja') { this.navigate('caja'); app.showNotification("⚠️ Debe abrir caja"); return; }
         const content = document.getElementById('content');
         content.innerHTML = `
-            <div class="pos-main-wrapper">
+            <div class="pos-main-wrapper" id="pos-wrapper">
+                <!-- Columna 1: Catálogo -->
                 <div class="catalog-container">
                     <div class="user-header">
                         <span>👤 ${this.currentUser?.nombre || 'Invitado'}</span>
@@ -150,18 +165,147 @@ const router = {
                     <div class="category-carousel" id="category-carousel"></div>
                     <div class="catalog-scroll-area"><div class="products-grid" id="products-grid"></div></div>
                 </div>
-                <div class="order-side-panel" id="order-side"></div>
+
+                <!-- Columna 2: Pedido (Central - Colapsable) -->
+                <div class="order-side-panel" id="order-side">
+                    <!-- El contenido se renderiza en renderOrderPanel() -->
+                </div>
+
+                <!-- Columna 3: Control de Caja / Pendientes (Derecha) -->
+                <div class="caja-side-panel" id="caja-side">
+                    <!-- El contenido se renderiza en renderCajaPanel() -->
+                </div>
             </div>
-            <div class="floating-actions" id="pos-floating-actions">
+
+            <!-- Botones Flotantes (Solo visibles cuando el pedido está contraído) -->
+            <div class="floating-actions" id="pos-floating-actions" style="display: none;">
                 <div class="btn-float add-plato" onclick="router.nuevoPlato()">🍽️+</div>
-                <div class="btn-float cart" onclick="router.toggleMobileOrder()">🛒</div>
+                <div class="btn-float cart" onclick="router.toggleOrderCollapse()">🛒</div>
             </div>
         `;
         this.renderCategories(); 
         this.renderProducts(); 
-        this.renderOrderPanel(); 
+        this.renderOrderPanel();
+        this.renderCajaPanel();
         
-        // El layout dual (side-by-side) se maneja ahora puramente por CSS media queries (801px+)
+        // Inicializar estado de colapso si es necesario
+        this._isOrderCollapsed = false;
+        this.updateFloatingButtonsVisibility();
+    },
+
+    renderCajaPanel() {
+        const container = document.getElementById('caja-side');
+        if (!container) return;
+        
+        const isAdmin = this.currentUser?.puesto === 'admin';
+        const t = db.turnoActual;
+        if (!t) return;
+        const efectivo = (t.inicioCaja + (t.ventas_efectivo || 0) - t.gastos - (t.retiros || 0));
+        
+        // Calcular Total No Cobrado
+        const totalNoCobrado = db.pedidosActivos.reduce((sum, p) => sum + db.calcularTotal(p), 0);
+
+        container.innerHTML = `
+            <div class="caja-panel-header">
+                <h3>CONTROL DE CAJA</h3>
+                <button class="btn-retiro-compact" onclick="router.showRetiroKeypad()">💸 RETIRO</button>
+            </div>
+            
+            <div class="caja-panel-content scrollable-y">
+                ${isAdmin ? `
+                    <div class="stats-compact-grid">
+                        <div class="stat-box">CAJA: <b>$${efectivo.toFixed(0)}</b></div>
+                        <div class="stat-box">RETIROS: <b style="color:red;">$${(t.retiros||0).toFixed(0)}</b></div>
+                    </div>
+                ` : ''}
+
+                <div class="total-no-cobrado-card">
+                    <small>TOTAL NO COBRADO (AUDITORÍA)</small>
+                    <div class="amount">$${totalNoCobrado.toFixed(2)}</div>
+                </div>
+
+                <div class="pendientes-list">
+                    <h4>CUENTAS ABIERTAS</h4>
+                    ${db.pedidosActivos.map(p => `
+                        <div class="pendiente-item-compact">
+                            <div class="p-info">
+                                <b>${p.tipo==='mesa' ? 'M#'+p.mesaNumero : (p.tipo==='domicilio'?'🛵':'🥡')+ (p.cliente?.nombre || 'S/N')}</b>
+                                <span>$${db.calcularTotal(p).toFixed(0)}</span>
+                            </div>
+                            <div class="p-actions">
+                                <button onclick="printer.printBill(db.pedidosActivos.find(x=>x.id===${p.id}))">📄</button>
+                                <button class="btn-cobrar-fast" onclick="router.showPaymentModal(${p.id})">COBRAR</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                    ${db.pedidosActivos.length === 0 ? '<p style="color:#999; font-size:0.8rem; text-align:center;">Sin pendientes</p>' : ''}
+                </div>
+            </div>
+        `;
+    },
+
+    showRetiroKeypad() {
+        this.askForPin('admin', () => {
+            const m = document.createElement('div');
+            m.className = 'modal-full';
+            m.id = 'retiro-modal';
+            m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:30000;";
+            this._retiroBuffer = '';
+            
+            m.innerHTML = `
+                <div class="pin-modal-card" style="max-width:350px;">
+                    <h3>MONTO RETIRO</h3>
+                    <div class="pin-display" id="retiro-display" style="letter-spacing:2px; font-size:2rem;">$0</div>
+                    <div class="numpad-grid">
+                        ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="btn-numpad" onclick="router._handleRetiroKey('${n}')">${n}</button>`).join('')}
+                        <button class="btn-numpad clear" onclick="router._handleRetiroKey('C')">C</button>
+                        <button class="btn-numpad" onclick="router._handleRetiroKey('0')">0</button>
+                        <button class="btn-numpad" style="background:var(--primary); font-size:1rem;" onclick="router._execRetiro()">OK</button>
+                    </div>
+                    <button class="btn-secondary" style="margin-top:15px; width:100%; border:none; color:#888;" onclick="document.getElementById('retiro-modal').remove()">CANCELAR</button>
+                </div>
+            `;
+            document.body.appendChild(m);
+        });
+    },
+
+    _retiroBuffer: '',
+    _handleRetiroKey(key) {
+        if (key === 'C') this._retiroBuffer = '';
+        else this._retiroBuffer += key;
+        document.getElementById('retiro-display').innerText = '$' + (this._retiroBuffer || '0');
+    },
+
+    async _execRetiro() {
+        const monto = parseFloat(this._retiroBuffer);
+        if (monto > 0) {
+            await db.registrarRetiro(monto, "Retiro parcial");
+            document.getElementById('retiro-modal').remove();
+            this.renderCajaPanel();
+            app.showNotification("✅ Retiro registrado");
+        }
+    },
+
+    toggleOrderCollapse() {
+        this._isOrderCollapsed = !this._isOrderCollapsed;
+        const panel = document.getElementById('order-side');
+        const wrapper = document.getElementById('pos-wrapper');
+        
+        if (this._isOrderCollapsed) {
+            panel.classList.add('collapsed');
+            wrapper.classList.add('order-hidden');
+        } else {
+            panel.classList.remove('collapsed');
+            wrapper.classList.remove('order-hidden');
+        }
+        this.updateFloatingButtonsVisibility();
+    },
+
+    updateFloatingButtonsVisibility() {
+        const btns = document.getElementById('pos-floating-actions');
+        if (btns) {
+            btns.style.display = (this._isOrderCollapsed || window.innerWidth < 900) ? 'flex' : 'none';
+        }
     },
 
     renderCategories() {
@@ -318,96 +462,43 @@ const router = {
     },
 
     _addItemToOrder(prod, carneId = null, isPremium = false) {
+        // LÓGICA DE EXTRAS PARA ACTUALIZACIONES (MESAS)
+        const isUpdate = !!this.ordenActual.id;
+        
+        if (isUpdate && this.orderType === 'mesa') {
+            // Buscar si ya existe el plato virtual "EXTRAS"
+            let platoExtra = this.ordenActual.platos.find(p => p.nombre === 'EXTRAS');
+            if (!platoExtra) {
+                platoExtra = { nombre: 'EXTRAS', items: [], sinCebolla: false, sinCilantro: false, sinVerdura: false, notas: '' };
+                this.ordenActual.platos.push(platoExtra);
+            }
+            this.currentPlatoIdx = this.ordenActual.platos.indexOf(platoExtra);
+        }
+
         const plato = this.ordenActual.platos[this.currentPlatoIdx];
         const conQueso = document.getElementById('lonche-q')?.checked || false;
-        const item = { ...prod, cantidad: 1, carneId, conQueso, isPremiumMeat: isPremium, variantes: prod.variantes };
+        
+        // Taps consecutivos: buscar item idéntico y sumar cantidad
         const existing = plato.items.find(i => i.id === prod.id && i.carneId === carneId && i.conQueso === conQueso);
-        if (existing) existing.cantidad++; else plato.items.push(item);
+        
+        if (existing) {
+            existing.cantidad++;
+            app.showNotification(`${prod.nombre} x${existing.cantidad}`);
+        } else {
+            const item = { ...prod, cantidad: 1, carneId, conQueso, isPremiumMeat: isPremium, variantes: prod.variantes };
+            plato.items.push(item);
+            app.showNotification(`+ ${prod.nombre}`);
+        }
+
+        // Limpieza de UI
         document.querySelectorAll('.modal-full').forEach(m => m.remove());
         this.refreshOrderList(); 
-        app.showNotification(`+ ${prod.nombre}`);
 
         // Auto-mostrar panel en movil al agregar
         if (window.innerWidth < 960) {
             document.getElementById('order-side').classList.add('mobile-active');
         }
     },
-
-    renderOrderPanel() {
-        const container = document.getElementById('order-side'); if (!container) return;
-        const isUpdate = !!this.ordenActual.id;
-        container.innerHTML = `
-            <div style="background:var(--primary); color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
-                <button class="btn-close-order" onclick="router.collapseMobileOrder()">↓</button>
-                <b style="flex:1; text-align:center;">${this.orderType.toUpperCase()} ${this.currentMesa ? '#'+this.currentMesa.numero : ''}</b>
-                <button class="btn-accent" onclick="router.nuevoPlato()" style="padding:4px 10px; font-size:0.7rem;">+ PLATO</button>
-            </div>
-            <div style="padding:6px; background:#eee; display:flex; gap:4px;">
-                <button class="btn-type ${this.orderType==='mesa'?'active':''}" onclick="router.setOrderType('mesa')" style="flex:1;">Mesa</button>
-                <button class="btn-type ${this.orderType==='llevar'?'active':''}" onclick="router.setOrderType('llevar')" style="flex:1;">Llevar</button>
-                <button class="btn-type ${this.orderType==='domicilio'?'active':''}" onclick="router.setOrderType('domicilio')" style="flex:1;">🛵 Dom</button>
-            </div>
-            <div id="platos-lista" class="scrollable-y" style="flex:1; background:#f5f5f5;"></div>
-            <div class="order-footer">
-                <div id="order-total" style="font-size:1.4rem; font-weight:bold; margin-bottom:10px;">Total: $0</div>
-                <button class="btn-primary" style="width:100%; padding:15px;" onclick="router.enviarOrden()">${isUpdate?'GUARDAR CAMBIOS':'ENVIAR ORDEN'}</button>
-            </div>
-        `;
-        this.refreshOrderList();
-    },
-
-    refreshOrderList() {
-        const container = document.getElementById('platos-lista'); if (!container) return;
-        container.innerHTML = this.ordenActual.platos.map((pl, idx) => `
-            <div class="plato-card ${idx === this.currentPlatoIdx ? 'active' : ''}" onclick="router.selectPlato(${idx})">
-                <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:5px;"><b>PLATO ${idx + 1}</b><span style="color:red;" onclick="event.stopPropagation(); router.eliminarPlatoEspecifico(${idx})">🗑️</span></div>
-                ${pl.items.map((it, i) => {
-                    const code = it.abreviatura || it.nombre.substring(0,5).toUpperCase();
-                    const meatCode = it.carneId ? it.carneId.toUpperCase() : '';
-                    return `
-                        <div style="display:flex; justify-content:space-between; font-size:0.85rem; padding:4px 0; border-bottom:1px solid #eee;">
-                            <span><b>${it.cantidad}x</b> ${code} <small style="color:var(--primary); font-weight:bold;">${meatCode}</small></span>
-                            <span>$${(it.precio*it.cantidad).toFixed(2)} <span style="color:red;" onclick="event.stopPropagation(); router.eliminarItem(${i})">×</span></span>
-                        </div>
-                    `;
-                }).join('')}
-                <div class="plato-switches">
-                    <button class="toggle-btn ${pl.sinCebolla?'active':''}" onclick="event.stopPropagation(); router.toggleSwitch(${idx}, 'sinCebolla')">S/ Ceb</button>
-                    <button class="toggle-btn ${pl.sinCilantro?'active':''}" onclick="event.stopPropagation(); router.toggleSwitch(${idx}, 'sinCilantro')">S/ Cil</button>
-                    <button class="toggle-btn ${pl.sinVerdura?'active':''}" onclick="event.stopPropagation(); router.toggleSwitch(${idx}, 'sinVerdura')">S/ Ver</button>
-                </div>
-                <input type="text" class="plato-nota" placeholder="Nota..." value="${pl.notas||''}" oninput="router.updatePlatoNota(${idx}, this.value)">
-            </div>
-        `).join('');
-        this.updateTotal();
-    },
-
-    updateTotal() { const t = db.calcularTotal({ ...this.ordenActual, cliente: this.cliente }); document.getElementById('order-total').innerText = `Total: $${t.toFixed(2)}`; },
-    selectPlato(idx) { this.currentPlatoIdx = idx; document.querySelectorAll('.plato-card').forEach((c, i) => c.classList.toggle('active', i === idx)); },
-    updatePlatoNota(idx, val) { this.ordenActual.platos[idx].notas = val; },
-    nuevoPlato() { 
-        this.ordenActual.platos.push({ items: [], sinCebolla: false, sinCilantro: false, sinVerdura: false, notas: '' }); 
-        this.currentPlatoIdx = this.ordenActual.platos.length-1; 
-        this.renderOrderPanel(); 
-        
-        // Auto-scroll al final de la lista para que el nuevo plato sea visible
-        setTimeout(() => {
-            const list = document.getElementById('platos-lista');
-            if (list) list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' });
-        }, 100);
-
-        // Auto-mostrar panel en movil
-        if (window.innerWidth < 960) {
-            document.getElementById('order-side').classList.add('mobile-active');
-        }
-    },
-    eliminarItem(idx) { this.ordenActual.platos[this.currentPlatoIdx].items.splice(idx, 1); this.refreshOrderList(); },
-    eliminarPlatoEspecifico(idx) { if(this.ordenActual.platos.length > 1) { this.ordenActual.platos.splice(idx, 1); if(this.currentPlatoIdx >= this.ordenActual.platos.length) this.currentPlatoIdx = 0; this.renderOrderPanel(); } },
-    toggleSwitch(idx, f) { this.ordenActual.platos[idx][f] = !this.ordenActual.platos[idx][f]; this.refreshOrderList(); },
-    setOrderType(t) { this.orderType = t; this.renderOrderPanel(); },
-    toggleMobileOrder() { document.getElementById('order-side').classList.toggle('mobile-active'); },
-    collapseMobileOrder() { document.getElementById('order-side').classList.remove('mobile-active'); },
-
 
     async enviarOrden() {
         if (this._enviando) return;
@@ -431,19 +522,30 @@ const router = {
             await sync.enviarOrdenACaja(pedido);
 
             if (sync.role === 'caja') {
-                // REGLA: Las mesas solo imprimen la primera comanda por defecto. 
-                // Si es actualización, solo imprimen si 'imprimirExtras' está habilitado.
                 const debaImprimirCocina = !isUpdate || db.config.imprimirExtras;
                 
                 if (debaImprimirCocina) {
-                    await printer.printOrder(pedido);
+                    // Si es actualización, solo imprimimos el plato de EXTRAS si existe
+                    if (isUpdate) {
+                        const extrasPlato = pedido.platos.find(p => p.nombre === 'EXTRAS');
+                        if (extrasPlato) {
+                            const pedidoSoloExtras = { ...pedido, platos: [extrasPlato] };
+                            await printer.printOrder(pedidoSoloExtras, true); // SILENT
+                        }
+                    } else {
+                        await printer.printOrder(pedido, true); // SILENT
+                    }
                 }
 
-                // Para llevar y domicilio imprimen ticket de cuenta inmediatamente
+                // LLEVAR Y DOMICILIO: Impresión Directa y Automatizada (Doble Ticket)
                 if (pedido.tipo !== 'mesa') {
-                    await printer.printBill(pedido);
+                    // 1. Comanda de cocina (Silent)
+                    await printer.printOrder(pedido, true);
+                    // 2. Ticket de cliente (Silent)
+                    await printer.printBill(pedido, false, true); // true = modo directo/silent
                 }
             }
+
             app.showNotification("✅ ORDEN ENVIADA"); 
             this.resetPOS(); 
             this.navigate('pos');
@@ -453,6 +555,94 @@ const router = {
         } finally {
             this._enviando = false;
         }
+    },
+
+    setOrderType(type) { this.orderType = type; this.renderOrderPanel(); },
+    selectPlato(idx) { this.currentPlatoIdx = idx; this.refreshOrderList(); },
+    nuevoPlato() {
+        this.ordenActual.platos.push({ items: [], sinCebolla: false, sinCilantro: false, sinVerdura: false, notas: '' });
+        this.currentPlatoIdx = this.ordenActual.platos.length - 1;
+        this.refreshOrderList();
+    },
+    eliminarPlatoEspecifico(idx) {
+        if (this.ordenActual.platos.length > 1) {
+            this.ordenActual.platos.splice(idx, 1);
+            this.currentPlatoIdx = Math.max(0, this.currentPlatoIdx - 1);
+            this.refreshOrderList();
+        } else {
+            this.ordenActual.platos[0] = { items: [], sinCebolla: false, sinCilantro: false, sinVerdura: false, notas: '' };
+            this.refreshOrderList();
+        }
+    },
+    eliminarItem(idx) {
+        this.ordenActual.platos[this.currentPlatoIdx].items.splice(idx, 1);
+        this.refreshOrderList();
+    },
+    toggleSwitch(platoIdx, field) {
+        this.ordenActual.platos[platoIdx][field] = !this.ordenActual.platos[platoIdx][field];
+        this.refreshOrderList();
+    },
+    updatePlatoNota(idx, value) {
+        this.ordenActual.platos[idx].notas = value;
+    },
+    updateTotal() {
+        const total = db.calcularTotal(this.ordenActual);
+        const el = document.getElementById('order-total');
+        if (el) el.innerText = `Total: $${total.toFixed(2)}`;
+    },
+
+    renderOrderPanel() {
+        const container = document.getElementById('order-side'); if (!container) return;
+        const isUpdate = !!this.ordenActual.id;
+        
+        // REGLA: Los botones de tipo de pedido deben tener clase activa
+        container.innerHTML = `
+            <div style="background:var(--primary); color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
+                <button class="btn-toggle-order" onclick="router.toggleOrderCollapse()">↓</button>
+                <b style="flex:1; text-align:center;">${this.orderType.toUpperCase()} ${this.currentMesa ? '#'+this.currentMesa.numero : ''}</b>
+                ${this.orderType === 'mesa' ? `<button class="btn-accent" onclick="router.nuevoPlato()" style="padding:4px 10px; font-size:0.7rem;">+ PLATO</button>` : ''}
+            </div>
+            <div style="padding:10px; background:#eee; display:flex; gap:8px;">
+                <button class="btn-type ${this.orderType==='mesa'?'active':''}" onclick="router.setOrderType('mesa')" style="flex:1;">MESA</button>
+                <button class="btn-type ${this.orderType==='llevar'?'active':''}" onclick="router.setOrderType('llevar')" style="flex:1;">LLEVAR</button>
+                <button class="btn-type ${this.orderType==='domicilio'?'active':''}" onclick="router.setOrderType('domicilio')" style="flex:1;">DOM</button>
+            </div>
+            <div id="platos-lista" class="scrollable-y" style="flex:1; background:#f5f5f5;"></div>
+            <div class="order-footer">
+                <div id="order-total" style="font-size:1.4rem; font-weight:bold; margin-bottom:10px; text-align:center;">Total: $0</div>
+                <button class="btn-primary" style="width:100%; padding:15px;" onclick="router.enviarOrden()">${isUpdate?'GUARDAR CAMBIOS':'ENVIAR ORDEN'}</button>
+            </div>
+        `;
+        this.refreshOrderList();
+    },
+
+    refreshOrderList() {
+        const container = document.getElementById('platos-lista'); if (!container) return;
+        container.innerHTML = this.ordenActual.platos.map((pl, idx) => `
+            <div class="plato-card ${idx === this.currentPlatoIdx ? 'active' : ''}" onclick="router.selectPlato(${idx})">
+                <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:5px;">
+                    <b>${pl.nombre || 'PLATO ' + (idx + 1)}</b>
+                    <span style="color:red;" onclick="event.stopPropagation(); router.eliminarPlatoEspecifico(${idx})">🗑️</span>
+                </div>
+                ${pl.items.map((it, i) => {
+                    const code = it.abreviatura || it.nombre.substring(0,5).toUpperCase();
+                    const meatCode = it.carneId ? it.carneId.toUpperCase() : '';
+                    return `
+                        <div style="display:flex; justify-content:space-between; font-size:0.85rem; padding:6px 0; border-bottom:1px solid #eee;">
+                            <span><b>${it.cantidad}x</b> ${code} <small style="color:var(--primary); font-weight:bold;">${meatCode}</small></span>
+                            <span>$${(it.precio*it.cantidad).toFixed(2)} <span style="color:red;" onclick="event.stopPropagation(); router.eliminarItem(${i})">×</span></span>
+                        </div>
+                    `;
+                }).join('')}
+                <div class="plato-switches">
+                    <button class="toggle-btn ${pl.sinCebolla?'active':''}" onclick="event.stopPropagation(); router.toggleSwitch(${idx}, 'sinCebolla')">S/ Ceb</button>
+                    <button class="toggle-btn ${pl.sinCilantro?'active':''}" onclick="event.stopPropagation(); router.toggleSwitch(${idx}, 'sinCilantro')">S/ Cil</button>
+                    <button class="toggle-btn ${pl.sinVerdura?'active':''}" onclick="event.stopPropagation(); router.toggleSwitch(${idx}, 'sinVerdura')">S/ Ver</button>
+                </div>
+                <input type="text" class="plato-nota" placeholder="Nota..." value="${pl.notas||''}" oninput="router.updatePlatoNota(${idx}, this.value)">
+            </div>
+        `).join('');
+        this.updateTotal();
     },
 
     resetPOS() { this.ordenActual = { platos: [{ items: [], sinCebolla: false, sinCilantro: false, sinVerdura: false, notas: '' }] }; this.cliente = { nombre: '', tel: '', dir: '', zona: null }; this.currentMesa = null; this.currentPlatoIdx = 0; this.orderType = sync.role === 'caja' ? 'llevar' : 'mesa'; },
@@ -477,21 +667,32 @@ const router = {
             content.innerHTML = `<div style="padding:60px; text-align:center;"><h2>Caja Cerrada</h2><input type="number" id="ini-c" placeholder="$ Fondo inicial" style="padding:15px; width:200px; text-align:center; font-size:1.5rem; border-radius:10px; border:1px solid #ddd;"><br><button class="btn-primary" style="margin-top:20px;" onclick="router.handleAbrirCaja(document.getElementById('ini-c').value)">ABRIR TURNO</button></div>`;
             return;
         }
+        
+        const isAdmin = this.currentUser?.puesto === 'admin';
         const t = db.turnoActual;
         const efectivo = (t.inicioCaja + (t.ventas_efectivo || 0) - t.gastos - (t.retiros || 0));
+        
         content.innerHTML = `
             <div style="padding:20px; height:100%;" class="scrollable-y">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;"><h2>Control de Caja</h2><button class="btn-accent" onclick="router.askForPin('admin', () => router.showRetiroModal())">💸 RETIRO</button></div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2>Control de Caja</h2>
+                    <button class="btn-accent" onclick="router.showRetiroKeypad()">💸 RETIRO</button>
+                </div>
+                
+                ${isAdmin ? `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
                     <div style="background:#fff9f0; padding:15px; border-radius:15px; border:1px solid #ffe0b2;">Dinero en Caja<br><b style="font-size:1.5rem;">$${efectivo.toFixed(2)}</b></div>
                     <div style="background:#f0f7ff; padding:15px; border-radius:15px; border:1px solid #d0e8ff;">Retiros<br><b style="font-size:1.5rem; color:red;">-$${(t.retiros||0).toFixed(2)}</b></div>
                 </div>
+                ` : '<div style="background:#f5f5f5; padding:15px; border-radius:15px; margin-bottom:20px; text-align:center; color:#666;">Modo Operativo (Cajero)</div>'}
+
                 <h3 style="border-bottom:2px solid var(--primary);">Pendientes de Pago</h3>
                 <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:15px;">
                     ${db.pedidosActivos.map(p => `<div class="admin-card"><b>${p.tipo==='mesa'?'Mesa '+p.mesaNumero:p.cliente.nombre||'Para llevar'}</b><br><span style="font-size:1.2rem; color:var(--primary); font-weight:bold;">$${db.calcularTotal(p).toFixed(2)}</span><div style="display:flex; gap:5px; margin-top:10px;"><button class="btn-secondary" onclick="printer.printBill(db.pedidosActivos.find(x=>x.id===${p.id}))">📄</button><button class="btn-primary" style="flex:1; background:#4CAF50;" onclick="router.showPaymentModal(${p.id})">COBRAR</button></div></div>`).join('')}
                     ${db.pedidosActivos.length === 0 ? '<p style="color:#999; text-align:center; padding:20px;">No hay pedidos pendientes</p>' : ''}
                 </div>
-                <button class="btn-primary" style="margin-top:40px; background:#333;" onclick="router.askForPin('admin', () => router.cerrarCajaModal())">CERRAR TURNO Y CORTE</button>
+                
+                ${isAdmin ? `<button class="btn-primary" style="margin-top:40px; background:#333;" onclick="router.askForPin('admin', () => router.cerrarCajaModal())">CERRAR TURNO Y CORTE</button>` : ''}
             </div>
         `;
     },
@@ -741,6 +942,13 @@ const router = {
     async handleSaveCarne(old) { const n = document.getElementById('cn-n').value; const id = document.getElementById('cn-id').value.toLowerCase(); const p = document.getElementById('cn-p').checked; if(n && id) { if(old) await db.updateCarne({id:old, nombre:n, premium:p}); else await db.addCarne({id, nombre:n, premium:p}); this.renderAdminCarnes(); document.querySelector('.modal-full').remove(); } },
     async handleDeleteCarne(id) { if(confirm("¿Eliminar?")) { await db.deleteCarne(id); this.renderAdminCarnes(); } },
     async handleToggleCarne(id) { await db.toggleCarne(id); this.renderAdminCarnes(); },
+
+    async handleAsistencia(id, sueldo) {
+        if(confirm("¿Registrar asistencia de hoy?")) {
+            await db.registrarAsistencia(id, sueldo);
+            app.showNotification("✅ Asistencia registrada");
+        }
+    },
 
     renderHRM() {
         const content = document.getElementById('content');

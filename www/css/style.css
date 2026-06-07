@@ -97,15 +97,17 @@ main#content {
 
 /* --- POS Responsive Layout --- */
 /* --- POS Layout Robust Split-View --- */
+/* --- POS Layout Robust Split-View --- */
 .pos-main-wrapper {
     display: flex;
     flex-direction: row;
-    height: 100%;
-    width: 100%;
+    height: calc(100vh - var(--header-h));
+    width: 100vw;
     overflow: hidden;
     background: #f4f4f4;
 }
 
+/* Columna 1: Catálogo */
 .catalog-container {
     flex: 1;
     display: flex;
@@ -113,10 +115,12 @@ main#content {
     min-width: 0;
     height: 100%;
     border-right: 1px solid #ddd;
+    transition: all 0.3s ease;
 }
 
+/* Columna 2: Pedidos */
 .order-side-panel {
-    width: 350px;
+    width: 380px;
     background: white;
     display: flex;
     flex-direction: column;
@@ -124,100 +128,213 @@ main#content {
     flex-shrink: 0;
     box-shadow: -5px 0 20px rgba(0,0,0,0.05);
     z-index: 10;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s ease, opacity 0.3s ease;
 }
 
-/* 1. CONFIGURACIÓN RESTRICCION VERTICAL (Mobile) */
-@media (max-width: 768px) {
-    .pos-main-wrapper {
-        flex-direction: column !important;
-    }
+.order-side-panel.collapsed {
+    width: 0;
+    opacity: 0;
+    transform: translateX(-20px);
+    overflow: hidden;
+    pointer-events: none;
+}
 
-    .catalog-container {
-        height: 60vh !important;
-        flex: none !important;
-        overflow-y: auto !important;
-        padding-bottom: 15px !important;
-    }
+/* Columna 3: Control de Caja (Derecha) */
+.caja-side-panel {
+    width: 320px;
+    background: #f9f9f9;
+    border-left: 1px solid #ddd;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    flex-shrink: 0;
+}
 
+/* Ajustes Responsive Tablet / Desktop */
+@media (min-width: 900px) {
+    .pos-main-wrapper.order-hidden .catalog-container {
+        flex: 1.5; /* Se expande un poco más */
+    }
+}
+
+/* Compact Caja Panel */
+.caja-panel-header {
+    background: #333;
+    color: white;
+    padding: 12px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.caja-panel-header h3 { font-size: 0.9rem; margin: 0; letter-spacing: 1px; }
+
+.btn-retiro-compact {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.caja-panel-content {
+    flex: 1;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+.stats-compact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.stat-box {
+    background: white;
+    padding: 10px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    border: 1px solid #eee;
+    text-align: center;
+}
+
+.stat-box b { display: block; font-size: 1.1rem; margin-top: 4px; }
+
+/* Redesigned Total No Cobrado Card */
+.total-no-cobrado-card {
+    background: linear-gradient(135deg, #1a237e, #0d47a1);
+    color: white;
+    padding: 20px 15px;
+    border-radius: 15px;
+    margin-bottom: 20px;
+    text-align: center;
+    box-shadow: 0 10px 25px rgba(13, 71, 161, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.total-no-cobrado-card::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.total-no-cobrado-card small { 
+    font-size: 0.65rem; 
+    opacity: 0.85; 
+    letter-spacing: 1.5px; 
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.total-no-cobrado-card .amount { 
+    font-size: 2.2rem; 
+    font-weight: 900; 
+    color: #ffd600; 
+    margin-top: 5px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.pendientes-list h4 { font-size: 0.75rem; color: #666; margin-bottom: 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+
+.pendiente-item-compact {
+    background: white;
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    border: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pendiente-item-compact .p-info b { font-size: 0.85rem; display: block; }
+.pendiente-item-compact .p-info span { font-size: 1rem; font-weight: bold; color: var(--primary); }
+
+.pendiente-item-compact .p-actions { display: flex; gap: 5px; }
+.pendiente-item-compact .p-actions button {
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    background: #f5f5f5;
+    font-size: 0.8rem;
+}
+
+.btn-cobrar-fast {
+    background: #4CAF50 !important;
+    color: white !important;
+    border: none !important;
+    font-weight: bold;
+    padding: 8px 12px !important;
+}
+
+/* Botones de Tipo de Pedido con Clase Activa Vibrante */
+.btn-type {
+    padding: 12px;
+    border: 2px solid #eee;
+    border-radius: 12px;
+    font-weight: 900;
+    font-size: 0.85rem;
+    background: white;
+    color: #555;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.btn-type.active {
+    background: #00c853 !important; /* Verde vibrante */
+    color: white !important;
+    border-color: #009624 !important;
+    box-shadow: 0 6px 15px rgba(0, 200, 83, 0.3);
+    transform: translateY(-2px);
+}
+
+
+/* Responsive Mobile (Override the 3 columns) */
+@media (max-width: 899px) {
+    .caja-side-panel { display: none; } /* Ocultar caja en móvil en el POS */
+    
+    .pos-main-wrapper { flex-direction: column; }
+    
     .order-side-panel {
-        position: fixed !important;
-        bottom: 0 !important;
-        left: 0 !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
         width: 100% !important;
-        height: 40vh !important;
-        max-height: 40vh !important;
-        min-height: 40vh !important;
-        transform: translateY(0) !important;
-        display: flex !important;
-        flex-direction: column !important;
-        box-shadow: 0 -10px 30px rgba(0,0,0,0.2) !important;
+        height: 50vh !important;
+        z-index: 5000;
         border-top-left-radius: 20px;
         border-top-right-radius: 20px;
-        overflow: hidden;
-        z-index: 5000;
+        transform: translateY(100%);
     }
 
-    /* Contenedor de platos horizontal */
-    #platos-lista {
-        display: flex !important;
-        flex-direction: row !important;
-        overflow-x: auto !important;
-        overflow-y: hidden !important;
-        scroll-snap-type: x mandatory !important;
-        gap: 12px !important;
-        padding: 10px !important;
-        background: #f5f5f5 !important;
-    }
-
-    .plato-card {
-        flex: 0 0 75% !important;
-        width: 75% !important;
-        scroll-snap-align: start !important;
-        margin-bottom: 0 !important;
-    }
-
-    .floating-actions {
-        display: none !important; /* Oculto ya que el panel es siempre visible 40vh */
+    .order-side-panel.mobile-active {
+        transform: translateY(0);
     }
 }
 
-/* 2. CONFIGURACIÓN RESTRICCION HORIZONTAL (Desktop/Tablet) */
-@media (min-width: 769px) {
-    .pos-main-wrapper {
-        display: grid !important;
-        grid-template-columns: 60% 40% !important;
-        height: calc(100vh - 60px) !important;
-        overflow: hidden !important;
-    }
+/* --- Toggle Button Pedido --- */
+.btn-toggle-order {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    font-size: 1.2rem;
+    padding: 0 10px;
+    border-radius: 8px;
+    cursor: pointer;
+}
 
-    .catalog-container {
-        height: 100% !important;
-        overflow-y: auto !important;
-    }
+.btn-toggle-order:active { background: rgba(0,0,0,0.1); }
 
-    .order-side-panel {
-        position: relative !important;
-        height: 100% !important;
-        width: 100% !important;
-        transform: none !important;
-        display: flex !important;
-        flex-direction: column !important;
-    }
-
-    #platos-lista {
-        display: block !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-    }
-
-    .plato-card {
-        flex: none !important;
-        width: 100% !important;
-        margin-bottom: 15px !important;
-    }
-
-    .floating-actions {
         display: none !important;
     }
 }

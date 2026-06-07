@@ -169,7 +169,9 @@ const app = {
         
         router.navigate('login');
 
-        // El menú lateral ahora es visible para ambos roles por petición del usuario
+        const isAdmin = router.currentUser?.puesto === 'admin';
+        
+        // El menú lateral ahora es visible para ambos roles, pero se filtran opciones sensibles
         sidebarMenu.innerHTML = `
             <div class="sidebar-header">
                 <div style="font-size:2rem; margin-bottom:10px;">🌮</div>
@@ -183,6 +185,7 @@ const app = {
                 <div class="sidebar-item" onclick="router.navigate('cocina')"><span>👨‍🍳</span> Monitor Cocina</div>
                 <div class="sidebar-item" onclick="router.navigate('caja')"><span>💰</span> Caja y Cobros</div>
                 
+                ${isAdmin ? `
                 <div style="margin:25px 20px 10px; font-size:0.65rem; color:#999; letter-spacing:1.5px; font-weight:900;">ADMINISTRACIÓN</div>
                 <div class="sidebar-item" onclick="router.navigate('admin_dashboard')"><span>📊</span> Dashboard</div>
                 <div class="sidebar-item" onclick="router.navigate('admin_informes')"><span>📈</span> Historial Ventas</div>
@@ -192,10 +195,11 @@ const app = {
                 <div class="sidebar-item" onclick="router.navigate('admin_hrm')"><span>👥</span> Personal y Sueldos</div>
                 <div class="sidebar-item" onclick="router.navigate('admin_logs')"><span>📝</span> Auditoría (Logs)</div>
                 <div class="sidebar-item" onclick="router.navigate('config')"><span>⚙️</span> Configuración</div>
+                ` : ''}
             </div>
 
             <div style="margin-top:40px; padding:0 15px 30px;">
-                <button class="btn-secondary" style="width:100%; border-color:#ffcdd2; color:#d32f2f; background:#fff5f5; border-radius:12px; padding:12px;" onclick="location.reload()">
+                <button class="btn-secondary" style="width:100%; border-color:#ffcdd2; color:#d32f2f; background:#fff5f5; border-radius:12px; padding:12px;" onclick="router.handleLogout()">
                     🚪 CERRAR SESIÓN
                 </button>
             </div>

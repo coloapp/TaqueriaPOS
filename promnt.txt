@@ -1,0 +1,174 @@
+# CONTEXTO DEL SISTEMA: TaqueriaPOS
+Aplicación híbrida de punto de venta (POS) optimizada para tabletas en entornos de alta velocidad (Tacos de Pastor y Suadero). 
+Tecnologías: Vanilla JavaScript (ES6+), CSS Grid/Flexbox, persistencia local (db.js) y enrutamiento dinámico (router.js).
+
+# OBJETIVO DE LA ITERACIÓN ACTUAL: Estabilización, Seguridad por Roles e Interfaz Táctil Eficiente
+
+## 1. RESTRECCIONES STRICTAS DE SEGURIDAD Y VISTAS POR ROL (router.js)
+- Evaluar el rol del usuario logueado mediante `this.currentUser?.puesto`.
+- Si el puesto NO es 'admin' (ej. 'cajero' o 'mesero'):
+  - Ocultar/bloquear por completo el acceso al Dashboard General, analíticas de ventas e ingresos totales.
+  - En la vista 'Control de Caja' (`renderCaja()`), prohibir la renderización de las tarjetas de "Dinero en Caja", "Retiros" y el botón de "CERRAR TURNO Y CORTE". En su lugar, mostrar un contenedor neutral con la clase o texto: `<div class="modo-operativo">Modo Operativo (Cajero)</div>`.
+  - Asegurar que al cambiar de usuario (Login/Logout), el estado de `this.currentUser` se actualice e impacte inmediatamente en el DOM sin requerir recarga forzada del navegador.
+
+## 2. COMPORTAMIENTO DE LA COLUMNA DE PEDIDOS Y BOTONES FLOTANTES
+- Validar el estado de visibilidad del panel lateral de pedidos (Sidebar/Drawer).
+- Cuando el panel de pedidos esté ABIERTO, aplicar de forma programática un estilo u ocultamiento (`display: none` o mutación de clase) a los botones flotantes de acción rápida ("Plato +" y "Carrito") para evitar colisiones visuales en pantallas táctiles de 10 pulgadas.
+- Al seleccionar los modos de pedido "Mesa", "Llevar" o "Dom", inyectar una clase de estado activo (ej. `.btn-active`) con colores de alto contraste definidos en `style.css` para identificar inmediatamente el flujo operativo actual.
+
+## 3. LÓGICA DE COMANDAS PARA MESAS ("EXTRAS") Y ACTUALIZACIÓN POR TAPS CONSECUTIVOS
+- Al agregar productos a una mesa que ya cuenta con un pedido activo en `db.pedidosActivos`:
+  - Agrupar automáticamente las nuevas adiciones bajo un contenedor virtual único denominado "EXTRAS".
+  - Permitir el incremento de cantidades (`cantidad++`) mediante eventos de tap/clic consecutivos sobre el mismo ítem en la cuadrícula de productos, evitando la apertura de modales intermedios de edición de cantidad.
+  - Para pedidos de tipo "Mesa", queda ESTRICTAMENTE PROHIBIDO disparar modales de previsualización de ticket al enviar la orden a cocina. El flujo debe ser directo y sin interrupciones para el mesero.
+
+## 4. AUDITORÍA DE CAJA: TARJETA "TOTAL NO COBRADO"
+- En la vista de Control de Caja (columna de pendientes), calcular en tiempo real el "TOTAL NO COBRADO" mediante el escaneo de todos los pedidos en `db.pedidosActivos` enviados a cocina pero no liquidados.
+- Renderizar este valor en una tarjeta destacada superior para control analítico del administrador.
+
+## 5. FLUJO DE IMPRESIÓN AUTOMATIZADA Y MODAL DE PREVISUALIZACIÓN DUAL (printer.js)
+- Al procesar y enviar un pedido de tipo "Llevar" o "Domicilio", disparar en segundo plano de forma automatizada la generación e impresión de DOS formatos de ticket independientes: Comanda (Cocina) y Cuenta (Cliente).
+- Para pedidos de tipo "Domicilio", es obligatorio extraer e inyectar en el encabezado o sección de cliente del ticket los campos: Teléfono y Dirección de Entrega.
+- El modal de previsualización (`TicketPreview`) debe rediseñarse visualmente: los botones de acción rápida ("ENVIAR POR WHATSAPP", "GUARDAR EN TELÉFONO") deben posicionarse de forma discreta en los márgenes inferiores o superiores, otorgando el 80% del área central a un viewport con scroll vertical independiente (`overflow-y: auto`) para inspeccionar la continuidad de ambos tickets cómodamente.
+
+# DIRECTIVA DE SALIDA
+Genera un parche de código limpio, modular, documentado internamente y directamente aplicable de forma offline al entorno local. No inventes dependencias externas; utiliza las APIs nativas del proyecto.
+
+
+======================================================================
+LOG DE ITERACIONES Y CONTROL DE HISTORIAL (NO BORRAR ESTA SECCIÓN)
+======================================================================
+DIRECTIVA PARA EL MODELO: Este archivo funciona como un cuaderno de bitácora acumulativo. Cada nueva instrucción se añade al final del documento. 
+- Debes escanear TODO el archivo para entender el contexto de los cambios pasados.
+- Tu prioridad absoluta es ejecutar la ÚLTIMA ITERACIÓN (la que se encuentra al final del archivo).
+- Usa las iteraciones pasadas como referencia para saber qué archivos modificaste y qué lógica debes respetar sin romperla.
+======================================================================
+
+--- INICIO DE HISTORIAL ---
+
+[Aquí puedes ir dejando o pegando tus prompts viejos si los tienes a la mano, separados por líneas]
+
+----------------------------------------------------------------------
+ITERACIÓN #4 (07/Junio/2026): REFINAMIENTO DE UI, SEGURIDAD Y TAPS
+----------------------------------------------------------------------
+# CONTEXTO DEL SISTEMA: TaqueriaPOS
+Aplicación híbrida de punto de venta (POS) optimizada para tabletas en entornos de alta velocidad.
+Tecnologías: Vanilla JavaScript (ES6+), CSS Grid/Flexbox, persistencia local (db.js) y enrutamiento dinámico (router.js).
+
+## 1. RESTRICCIONES ESTRICTAS DE SEGURIDAD Y VISTAS POR ROL (router.js)
+- Evaluar el rol del usuario logueado mediante 'this.currentUser?.puesto'.
+- Si el puesto NO es 'admin' (ej. 'cajero' o 'mesero'):
+  - Ocultar/bloquear por completo el acceso al Dashboard General, analíticas de ventas e ingresos totales.
+  - En la vista 'Control de Caja' ('renderCaja()'), prohibir la renderización de las tarjetas de "Dinero en Caja", "Retiros" y el botón de "CERRAR TURNO Y CORTE". En su lugar, mostrar un contenedor neutral: `<div class="modo-operativo">Modo Operativo (Cajero)</div>`.
+  - Asegurar que al cambiar de usuario (Login/Logout), el estado de 'this.currentUser' se actualice e impacte inmediatamente en el DOM sin requerir recarga forzada.
+
+## 2. COMPORTAMIENTO DE LA COLUMNA DE PEDIDOS Y BOTONES FLOTANTES (router.js / style.css)
+- Cuando el panel de pedidos esté ABIERTO, ocultar por completo (`display: none` o remoción de clase) los botones flotantes de acción rápida ("Plato +" y "Carrito") para evitar colisiones visuales en pantallas de 10 pulgadas.
+- Al seleccionar los modos de pedido "Mesa", "Llevar" o "Dom", inyectar una clase de estado activo (ej. '.btn-active' o '.order-type-btn.active') con colores de alto contraste para identificar inmediatamente el flujo operativo actual.
+
+## 3. LÓGICA DE COMANDAS PARA MESAS ("EXTRAS") Y ACTUALIZACIÓN POR TAPS CONSECUTIVOS
+- Al agregar productos a una mesa que ya cuenta con un pedido activo en 'db.pedidosActivos':
+  - Agrupar automáticamente las nuevas adiciones bajo un contenedor virtual único denominado "EXTRAS".
+  - Permitir el incremento de cantidades (`cantidad++`) mediante eventos de tap/clic consecutivos sobre el mismo ítem en la cuadrícula de productos, evitando la apertura de modales intermedios de edición de cantidad.
+  - Para pedidos de tipo "Mesa", queda ESTRICTAMENTE PROHIBIDO disparar modales de previsualización de ticket al enviar la orden a cocina. El flujo debe ser directo e instantáneo para el mesero.
+
+## 4. AUDITORÍA DE CAJA: TARJETA "TOTAL NO COBRADO" (router.js)
+- En la vista de Control de Caja (columna de pendientes), calcular en tiempo real el "TOTAL NO COBRADO" sumando todos los pedidos en 'db.pedidosActivos' enviados a cocina pero no liquidados. Renderizar este valor en una tarjeta destacada superior.
+
+## 5. FLUJO DE IMPRESIÓN AUTOMATIZADA Y PREVISUALIZACIÓN DUAL (printer.js / style.css)
+- Al procesar y enviar un pedido de tipo "Llevar" o "Domicilio", disparar en segundo plano de forma automatizada la generación e impresión de DOS formatos de ticket independientes: Comanda (Cocina) y Cuenta (Cliente).
+- Para pedidos de tipo "Domicilio", extraer e inyectar obligatoriamente en el ticket los campos: Teléfono y Dirección de Entrega del cliente.
+- El modal de previsualización dual ('TicketPreview') debe rediseñarse: los botones de acción rápida ("ENVIAR POR WHATSAPP", "GUARDAR EN TELÉFONO") deben ser pequeños, discretos y ubicarse en los márgenes, otorgando el 80% del área central a un viewport con scroll vertical independiente (`overflow-y: auto`) para inspeccionar la continuidad de ambos tickets cómodamente.
+
+# DIRECTIVA DE SALIDA
+Genera un parche de código limpio, modular, directamente aplicable de forma offline al entorno local. Modifica quirúrgicamente 'router.js', 'style.css' y 'printer.js' según corresponda.
+
+----------------------------------------------------------------------
+ITERACIÓN #5 (07/Junio/2026): LÓGICA REFINADA DE PLATOS INICIALES Y EXTRAS POR MESA
+----------------------------------------------------------------------
+# CONTEXTO DEL FLUJO DE TRABAJO (MESA ACUMULATIVA)
+Modificar el comportamiento de la asignación de productos en las mesas dentro de 'router.js' para ajustarse estrictamente a este ciclo de vida:
+
+## 1. ESTADO INICIAL: MESA SIN PEDIDO ENVIADO (Primera Orden)
+- Al abrir una mesa vacía (sin pedidos previos enviados a cocina en 'db.pedidosActivos'):
+  - El sistema debe inicializar y seleccionar por defecto el "Plato 1".
+  - Cada tap consecutivo en la cuadrícula de productos debe sumar la cantidad directamente en el plato que esté seleccionado en ese momento (ej. 2 taps a Pastor = 2 de Pastor en Plato 1).
+  - Al presionar el botón "+ PLATO", el sistema debe generar dinámicamente el "Plato 2" (y así sucesivamente), seleccionarlo de inmediato de manera automática y enfocar la vista del panel de pedidos en este nuevo contenedor.
+  - Al presionar enviar, se procesa la comanda estructurada por platos y se marca el pedido como ENVIADO.
+
+## 2. ESTADO SUBSECUENTE: MESA CON PEDIDO ENVIADO (Flujo de "EXTRAS")
+- Al abrir una mesa que YA posee un pedido activo enviado en 'db.pedidosActivos':
+  - Se debe omitir por completo la creación o selección de "Plato 1", "Plato 2", etc.
+  - El sistema debe interceptar cualquier nuevo tap de producto y redirigirlo directamente a un contenedor global virtual único llamado "EXTRAS" para esa mesa.
+  - El mesero puede incrementar la cantidad en "EXTRAS" mediante taps consecutivos (sin modales).
+  - Al presionar enviar, únicamente se generará la comanda de cocina correspondiente a los ítems nuevos agregados en el contenedor "EXTRAS", acumulándolos al histórico de la cuenta total de la mesa sin duplicar ni sobreescribir los platos enviados en la primera orden.
+
+# DIRECTIVA DE EJECUCIÓN
+Edita de forma precisa 'router.js' para reestructurar la condicional de inserción de productos basándote en si el pedido ya existe en 'db.pedidosActivos' y ha sido enviado a cocina o si es una sesión de mesa nueva.
+
+
+----------------------------------------------------------------------
+ITERACIÓN #6 (07/Junio/2026): INTERRUPTOR DE COMANDAS PARA EXTRAS Y LIMPIEZA DE CONFIGURACIÓN
+----------------------------------------------------------------------
+# CONTEXTO DE NEGOCIO Y REQUISITOS OPERATIVOS
+
+## 1. CONTROL DE IMPRESIÓN PARA COMPONENTES "EXTRAS" (db.js / config / router.js / printer.js)
+- En la base de datos local (`db.js`), asegurar una propiedad de configuración global llamada `config.imprimirExtras` (booleano, por defecto `true`).
+- En la pantalla de Configuración (`config`), añadir un interruptor visual (Toggle/Checkbox) etiquetado como: "Imprimir Comandas para Extras". Este control debe mutar el estado de `db.config.imprimirExtras` y guardarlo de forma persistente.
+- En la lógica de envío de órdenes de mesas (`router.js` / `enviarOrden`), al procesar ítems agregados en el contenedor "EXTRAS":
+  - Evaluar el estado de `db.config.imprimirExtras`.
+  - Si es `true`, disparar la función `printer.printOrder(pedidoExtras)` de forma automática y silenciosa hacia la cocina.
+  - Si es `false`, omitir por completo el flujo de impresión física en cocina. El sistema solo debe guardar y acumular los extras en la cuenta local de la mesa (en `db.pedidosActivos`) de forma silenciosa para su posterior cobro en caja.
+
+## 2. DEPRECACIÓN DE CAMPOS DE COSTOS EXTRAS EN CONFIGURACIÓN
+- En la vista y plantilla HTML de Configuración (`config`), ELIMINAR por completo los campos de entrada de texto/número destinados a "Añadir Costos Extras" o cargos globales genéricos.
+- Asegurar que toda la lógica de cálculo de precios del POS ignore esos campos obsoletos, delegando el control absoluto de adiciones o modificaciones de costos a la estructura de "variantes de precios por carne premium" ya integrada directamente dentro del catálogo del menú.
+
+# DIRECTIVA DE SALIDA
+Realiza una modificación limpia y quirúrgica en 'db.js', 'router.js' y la sección de configuración para adaptar la interfaz física de la taquería a ambas modalidades de trabajo.
+
+
+----------------------------------------------------------------------
+ITERACIÓN #7 (07/Junio/2026): LÓGICA DE ALERTAS POR LÍMITES DE EFECTIVO (MÍNIMO/MÁXIMO)
+----------------------------------------------------------------------
+# CONTEXTO DE CONTROL DE EFECTIVO (SEGURIDAD EN CAJA)
+Implementar una regla de auditoría en tiempo real dentro de 'router.js' (específicamente en 'renderCaja()' y al procesar un cobro exitoso) para monitorear los límites permitidos de efectivo físico en la caja registradora.
+
+## 1. REGLAS DE CONTROL DE FLUJO FISCAL
+- Calcular el efectivo neto actual del turno utilizando la fórmula estándar:
+  `const efectivoNeto = (t.inicioCaja + (t.ventas_efectivo || 0) - t.gastos - (t.retiros || 0));`
+
+## 2. COMPORTAMIENTO DE ALERTAS VISUALES Y RESTRICCIONES
+- REGLA DE MÁXIMO (Tope de Seguridad de $2000.00):
+  - Si `efectivoNeto >= 2000`, renderizar en la vista de caja un banner o alerta parpadeante de alta prioridad con el texto: "⚠️ ALERTA DE SEGURIDAD: Efectivo en caja excede los $2,000. Realice un RETIRO PARCIAL de inmediato."
+  - El botón "RETIRO" debe resaltar visualmente (ej. animación o color de alerta) para inducir al administrador o cajero a retirar el excedente y resguardar los valores.
+- REGLA DE MÍNIMO (Fondo de Cambio de $500.00):
+  - Si `efectivoNeto < 500`, mostrar una advertencia secundaria en el pie de la vista de caja indicando: "ℹ️ Aviso: Efectivo bajo en caja (Mínimo sugerido para cambio: $500)."
+
+## 3. NOTIFICACIÓN POST-COBRO
+- Cada vez que se liquide una cuenta exitosamente en efectivo y sume al turno, evaluar estas condiciones. Si se rompe el tope de los $2,000, disparar una notificación emergente instantánea ('app.showNotification') para alertar al personal antes de que regresen a la pantalla del POS.
+
+# DIRECTIVA DE SALIDA
+Modifica 'router.js' para inyectar estas validaciones visuales dentro del ciclo de renderizado de la caja, garantizando que el diseño sea limpio pero sumamente claro para el operador.
+
+
+----------------------------------------------------------------------
+ITERACIÓN #8 (07/Junio/2026): USUARIOS Y PIN POR DEFAULT PARA PRUEBAS TÁCTILES
+----------------------------------------------------------------------
+# CONTEXTO DE PERSISTENCIA Y AUTENTICACIÓN (db.js)
+Modificar la inicialización del catálogo de empleados dentro de 'db.js' para asegurar que el sistema cuente con credenciales predecibles de fábrica para la fase de pruebas intensivas en red local.
+
+## 1. INYECCIÓN DE USUARIOS SEMILLA (SEEDERS)
+- Al inicializar el arreglo de empleados (`db.empleados`), asegurar la existencia obligatoria de los siguientes 4 perfiles con sus respectivos roles y el PIN '1234' en formato de cadena de texto (string):
+  1. Nombre: "Admin"  | Puesto: "admin"   | PIN: "1234"
+  2. Nombre: "Cajero" | Puesto: "cajero"  | PIN: "1234"
+  3. Nombre: "Mesero" | Puesto: "mesero"  | PIN: "1234"
+  4. Nombre: "Mesera" | Puesto: "mesero"  | PIN: "1234"
+
+## 2. COMPATIBILIDAD CON EL LOGIN AUTOMÁTICO
+- Garantizar que la búsqueda interna en la función de login funcione sin importar mayúsculas o minúsculas al escribir el nombre (ej. 'cajero' o 'Cajero' deben resolver al mismo usuario).
+- Mantener la persistencia en el almacenamiento local (localStorage) para que estos usuarios semilla no se dupliquen si la aplicación se recarga múltiples veces en las tablets de los meseros.
+
+# DIRECTIVA DE SALIDA
+Modifica 'db.js' de forma limpia para incrustar esta lista de personal por defecto en el estado inicial de la aplicación.
+

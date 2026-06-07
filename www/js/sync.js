@@ -83,12 +83,26 @@ const sync = {
                     const p = JSON.parse(req.body);
                     await db.guardarPedido(p);
                     
+                    // AUTOMATIZACIÓN DE IMPRESIÓN AL RECIBIR PEDIDO DE MESERO
+                    if (this.role === 'caja') {
+                        // 1. Siempre imprimir comanda de cocina (Silent)
+                        if (typeof printer !== 'undefined') {
+                            await printer.printOrder(p, true);
+                            
+                            // 2. Si es Llevar o Domicilio, imprimir también la cuenta (Silent)
+                            if (p.tipo !== 'mesa') {
+                                await printer.printBill(p, false, true);
+                            }
+                        }
+                    }
+
                     // Automatizar badge y refrescar vistas si están abiertas
                     if (typeof router !== 'undefined') {
                         router.updateMonitorBadge();
                         const view = document.getElementById('content').dataset.view;
                         if (view === 'cocina') router.renderCocina();
                         if (view === 'caja') router.renderCaja();
+                        if (view === 'pos') router.renderCajaPanel(); // Actualizar columna derecha
                     }
                     
                     webserver.sendResponse(req.requestId, { 

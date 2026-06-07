@@ -107,6 +107,14 @@ const printer = {
 
         t += "ID: " + pedido.id + "\n";
         t += "FECHA: " + new Date().toLocaleString() + "\n";
+
+        if (pedido.tipo === 'domicilio' && pedido.cliente) {
+            t += this.drawLine('caja');
+            t += "CLIENTE: " + (pedido.cliente.nombre || 'N/A') + "\n";
+            t += "DIR: " + (pedido.cliente.dir || 'N/A') + "\n";
+            t += "TEL: " + (pedido.cliente.tel || 'N/A') + "\n";
+        }
+
         t += this.drawLine('caja');
         t += this.LEFT;
         
@@ -165,7 +173,7 @@ const printer = {
         // Simulación o Ticket Virtual si no hay entorno nativo
         if (!window.Capacitor || !window.Capacitor.isNativePlatform() || !targetMAC) {
             if (pedido && !silent) {
-                this.showVirtualTicket(pedido, type);
+                this.showDualPreview(pedido);
             } else if (!pedido && !silent) {
                 app.showNotification("⚠️ Impresora no configurada.");
             }
@@ -173,170 +181,126 @@ const printer = {
         }
 
         try {
-            // Soporte USB (Preparación conceptual): 
-            // Si el targetMAC empieza con "USB:", podríamos usar un plugin de Serial/USB OTG
-            if (targetMAC.startsWith("USB:")) {
-                app.showNotification(`Imprimiendo via USB en ${isCocina ? 'COCINA' : 'CAJA'}...`);
-                // Lógica real con plugin USB/Serial aquí
-            } else {
-                app.showNotification(`Imprimiendo via Bluetooth en ${isCocina ? 'COCINA' : 'CAJA'}...`);
-                // Lógica real Bluetooth aquí
-            }
+            // Lógica real Bluetooth aquí (omitida para brevedad en simulación)
         } catch (e) {
             console.error("Error Impresión:", e);
-            if (pedido && !silent) this.showVirtualTicket(pedido, type);
+            if (pedido && !silent) this.showDualPreview(pedido);
         }
     },
 
-    showVirtualTicket(pedido, type) {
+    async showDualPreview(pedido) {
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({
-            unit: 'mm',
-            format: [58, 160]
-        });
-
-        let y = 10;
-        const x = 29; 
-        const margin = 5;
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(11);
-        doc.text(db.config.nombreTaqueria.toUpperCase(), x, y, { align: 'center' });
         
-        doc.setFont("helvetica", "normal");
-        y += 5;
-        doc.setFontSize(7);
-        doc.text(db.config.direccion || '', x, y, { align: 'center' });
-        y += 4;
-        doc.text("Tel: " + (db.config.telefono || ''), x, y, { align: 'center' });
-        y += 5;
-        doc.setLineWidth(0.1);
-        doc.line(margin, y, 53, y);
-        y += 5;
-
-        doc.setFontSize(9);
-        doc.setFont(undefined, 'bold');
-        doc.text(type === 'cocina' ? "COMANDA COCINA" : "CUENTA CLIENTE", x, y, { align: 'center' });
-        y += 5;
-        doc.setFontSize(8);
-        doc.setFont(undefined, 'normal');
-        doc.text((pedido.tipo === 'mesa' ? "MESA #" + pedido.mesaNumero : "PEDIDO: " + pedido.tipo.toUpperCase()), margin, y);
-        y += 4;
-        doc.text("FECHA: " + new Date().toLocaleString(), margin, y);
-        y += 5;
-        doc.line(margin, y, 53, y);
-        y += 5;
-
-        pedido.platos.forEach((pl, i) => {
-            if (pl.items.length === 0) return;
+        const generateOnePDF = (isCocina) => {
+            const doc = new jsPDF({ unit: 'mm', format: [58, 200] }); // Formato largo para scroll
+            let y = 10; const x = 29; const margin = 5;
             
-            pl.items.forEach(it => {
-                doc.setFont(undefined, 'bold');
-                doc.text(`${it.cantidad}x ${it.nombre.toUpperCase()}`, margin, y);
-                if (type !== 'cocina') {
-                    doc.setFont(undefined, 'normal');
-                    doc.text(`$${(it.cantidad * it.precio).toFixed(2)}`, 53, y, { align: 'right' });
-                }
-                y += 4;
-                if (it.carneId) {
-                    doc.setFontSize(7);
-                    doc.setFont(undefined, 'italic');
-                    doc.text(`  (${it.carneId.toUpperCase()})`, margin, y);
+            doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+            doc.text(db.config.nombreTaqueria.toUpperCase(), x, y, { align: 'center' });
+            y += 5;
+            doc.setFontSize(7); doc.setFont("helvetica", "normal");
+            doc.text(db.config.direccion || '', x, y, { align: 'center' });
+            y += 4;
+            doc.text("Tel: " + (db.config.telefono || ''), x, y, { align: 'center' });
+            y += 5; doc.setLineWidth(0.1); doc.line(margin, y, 53, y); y += 5;
+
+            doc.setFontSize(9); doc.setFont(undefined, 'bold');
+            doc.text(isCocina ? "COMANDA COCINA" : "CUENTA CLIENTE", x, y, { align: 'center' });
+            y += 5; doc.setFontSize(8); doc.setFont(undefined, 'normal');
+            doc.text((pedido.tipo === 'mesa' ? "MESA #" + pedido.mesaNumero : "PEDIDO: " + pedido.tipo.toUpperCase()), margin, y);
+            y += 4;
+            doc.text("FECHA: " + new Date().toLocaleString(), margin, y);
+            
+            // EXTRACCIÓN DE DATOS DE CLIENTE PARA DOMICILIO
+            if (!isCocina && pedido.tipo === 'domicilio' && pedido.cliente) {
+                y += 4; doc.setFont(undefined, 'bold');
+                doc.text("CLIENTE: " + (pedido.cliente.nombre || 'N/A').toUpperCase(), margin, y);
+                y += 4; doc.text("TEL: " + (pedido.cliente.tel || 'N/A'), margin, y);
+                y += 4; doc.setFont(undefined, 'normal'); doc.setFontSize(7);
+                const dirLines = doc.splitTextToSize("DIR: " + (pedido.cliente.dir || 'N/A').toUpperCase(), 48);
+                doc.text(dirLines, margin, y);
+                y += (dirLines.length * 4);
+                doc.setFontSize(8);
+            }
+
+            y += 5; doc.line(margin, y, 53, y); y += 5;
+
+            pedido.platos.forEach((pl, i) => {
+                if (pl.items.length === 0) return;
+                pl.items.forEach(it => {
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`${it.cantidad}x ${it.nombre.toUpperCase()}`, margin, y);
+                    if (!isCocina) doc.setFont(undefined, 'normal'), doc.text(`$${(it.cantidad * it.precio).toFixed(2)}`, 53, y, { align: 'right' });
                     y += 4;
-                    doc.setFontSize(8);
-                    doc.setFont(undefined, 'normal');
-                }
+                    if (it.carneId) { doc.setFontSize(7); doc.setFont(undefined, 'italic'); doc.text(`  (${it.carneId.toUpperCase()})`, margin, y); y += 4; doc.setFontSize(8); doc.setFont(undefined, 'normal'); }
+                });
+                let extras = [];
+                if (pl.sinCebolla) extras.push("S/CEB"); if (pl.sinCilantro) extras.push("S/CIL"); if (pl.sinVerdura) extras.push("S/VER");
+                if (extras.length > 0) { doc.setFontSize(7); doc.text(">> " + extras.join(' '), margin, y); y += 4; }
+                if (pl.notas) { doc.setFontSize(7); doc.text(`* ${pl.notas}`, margin, y); y += 4; }
+                y += 2;
             });
             
-            let extras = [];
-            if (pl.sinCebolla) extras.push("S/CEB");
-            if (pl.sinCilantro) extras.push("S/CIL");
-            if (pl.sinVerdura) extras.push("S/VER");
-            if (extras.length > 0) {
-                doc.setFontSize(7);
-                doc.text(">> " + extras.join(' '), margin, y);
-                y += 4;
+            if (!isCocina) {
+                doc.line(margin, y, 53, y); y += 6;
+                doc.setFontSize(11); doc.setFont(undefined, 'bold');
+                doc.text("TOTAL: $" + db.calcularTotal(pedido).toFixed(2), 53, y, { align: 'right' });
             }
-            if (pl.notas) {
-                doc.setFontSize(7);
-                doc.text("NOTA: " + pl.notas, margin, y);
-                y += 4;
-            }
-            y += 1;
-        });
+            return doc.output('datauristring');
+        };
 
-        if (type !== 'cocina') {
-            y += 2;
-            doc.line(margin, y, 53, y);
-            y += 6;
-            doc.setFontSize(11);
-            doc.setFont(undefined, 'bold');
-            doc.text("TOTAL: $" + db.calcularTotal(pedido).toFixed(2), 53, y, { align: 'right' });
-            doc.setFont(undefined, 'normal');
-        }
-
-        y += 10;
-        doc.setFontSize(8);
-        doc.text("¡GRACIAS POR SU PREFERENCIA!", x, y, { align: 'center' });
-
-        const pdfDataUri = doc.output('datauristring');
-        const pdfBase64 = pdfDataUri.split(',')[1];
-        const fileName = `Ticket_${pedido.id}_${type}.pdf`;
+        const pdfCocina = generateOnePDF(true);
+        const pdfCuenta = generateOnePDF(false);
 
         const m = document.createElement('div');
         m.className = 'modal-full';
-        m.onclick = (e) => { if(e.target === m) m.remove(); };
-        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:50000; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:10px;";
+        m.id = 'dual-preview-modal';
+        m.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:50000; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:10px;";
+        
         m.innerHTML = `
-            <div class="modal-content-card" style="background:white; width:100%; max-width:420px; border-radius:25px; overflow:hidden; display:flex; flex-direction:column; box-shadow: 0 15px 50px rgba(0,0,0,0.5);">
-                <div style="padding:15px 20px; background:var(--primary); color:white; display:flex; justify-content:space-between; align-items:center;">
-                    <b style="font-size:1rem;">Vista Previa Ticket</b>
-                    <span onclick="this.closest('.modal-full').remove()" style="cursor:pointer; font-size:2rem; line-height:1;">&times;</span>
+            <div class="modal-content-card" style="background:white; width:95%; max-width:480px; height:90vh; border-radius:25px; overflow:hidden; display:flex; flex-direction:column;">
+                <div style="padding:15px; background:var(--primary); color:white; display:flex; justify-content:space-between; align-items:center;">
+                    <b style="font-size:0.9rem; letter-spacing:1px;">PREVISUALIZACIÓN</b>
+                    <span onclick="document.getElementById('dual-preview-modal').remove()" style="cursor:pointer; font-size:2rem; line-height:1;">&times;</span>
                 </div>
                 
-                <div style="flex:1; background:#f0f0f0; padding:10px; display:flex; justify-content:center; overflow-y:auto; max-height:60vh;">
-                    <iframe src="${pdfDataUri}#toolbar=0&navpanes=0" style="width:100%; height:450px; border:none; background:white; box-shadow: 0 2px 10px rgba(0,0,0,0.2);"></iframe>
+                <div style="display:flex; background:#eee; padding:5px; gap:5px;">
+                    <button id="btn-show-cocina" class="btn-type active" style="flex:1; padding:12px; font-size:0.8rem;" onclick="printer._switchPreview('cocina')">COMANDERA</button>
+                    <button id="btn-show-cuenta" class="btn-type" style="flex:1; padding:12px; font-size:0.8rem;" onclick="printer._switchPreview('cuenta')">CLIENTE</button>
                 </div>
 
-                <div style="padding:20px; display:grid; gap:12px; background:white; border-top:1px solid #eee;">
-                    <button class="btn-primary" style="background:#25D366; border:none; padding:16px; font-weight:bold; display:flex; align-items:center; justify-content:center; gap:10px; border-radius:15px;" 
-                            onclick="printer.shareNative('${pdfBase64}', '${fileName}', '${pedido.cliente?.tel || ''}', '${db.calcularTotal(pedido)}')">
-                        <span style="font-size:1.4rem;">📱</span> ENVIAR POR WHATSAPP
-                    </button>
-                    
-                    <button class="btn-secondary" style="padding:15px; border-radius:15px; font-weight:bold; border-color:#ddd;" 
-                            onclick="printer.downloadNative('${pdfBase64}', '${fileName}')">
-                        <span>📥</span> GUARDAR EN TELÉFONO
-                    </button>
+                <div style="flex:1; overflow-y:auto; background:#444; padding:15px; display:flex; justify-content:center;">
+                    <iframe id="preview-frame-cocina" src="${pdfCocina}#toolbar=0" style="width:100%; height:1000px; border:none; background:white; border-radius:10px;"></iframe>
+                    <iframe id="preview-frame-cuenta" src="${pdfCuenta}#toolbar=0" style="width:100%; height:1000px; border:none; background:white; border-radius:10px; display:none;"></iframe>
                 </div>
 
-                <div style="padding:12px; background:#f9f9f9; text-align:center; font-size:0.75rem; color:#888;">
-                    Toca fuera para cerrar
+                <div style="padding:15px; display:flex; gap:10px; background:white; border-top:1px solid #ddd;">
+                    <button class="btn-secondary" style="flex:1; padding:12px; font-size:0.75rem; border-radius:12px;" onclick="printer.shareNative('${pdfCuenta.split(',')[1]}', 'ticket.pdf', '${pedido.cliente?.tel||''}', '${db.calcularTotal(pedido)}')">📱 WHATSAPP</button>
+                    <button class="btn-secondary" style="flex:1; padding:12px; font-size:0.75rem; border-radius:12px;" onclick="printer.downloadNative('${pdfCuenta.split(',')[1]}', 'ticket.pdf')">📥 GUARDAR</button>
+                    <button class="btn-primary" style="flex:1; padding:12px; font-size:0.75rem; border-radius:12px;" onclick="document.getElementById('dual-preview-modal').remove()">ENTENDIDO</button>
                 </div>
             </div>
         `;
         document.body.appendChild(m);
     },
 
+    _switchPreview(type) {
+        document.getElementById('preview-frame-cocina').style.display = type === 'cocina' ? 'block' : 'none';
+        document.getElementById('preview-frame-cuenta').style.display = type === 'cuenta' ? 'block' : 'none';
+        document.getElementById('btn-show-cocina').classList.toggle('active', type === 'cocina');
+        document.getElementById('btn-show-cuenta').classList.toggle('active', type === 'cuenta');
+    },
+
     async shareNative(base64, name, tel, total) {
         if (window.Capacitor && window.Capacitor.isNativePlatform()) {
             try {
                 const { Share, Filesystem, Directory } = Capacitor.Plugins;
-                if (!Filesystem || !Share) throw new Error("Plugins no disponibles");
-
-                const result = await Filesystem.writeFile({
-                    path: name,
-                    data: base64,
-                    directory: Directory.Cache
-                });
-
-                await Share.share({
-                    title: 'Ticket Taquería',
-                    text: `Envío de ticket por $${total}`,
-                    url: result.uri
-                });
+                const tempPath = `temp_${Date.now()}.pdf`;
+                await Filesystem.writeFile({ path: tempPath, data: base64, directory: Directory.Cache });
+                const fileUri = await Filesystem.getUri({ path: tempPath, directory: Directory.Cache });
+                await Share.share({ title: 'Ticket de Venta', text: `Ticket por $${total}`, url: fileUri.uri });
             } catch (e) {
-                console.error("Error sharing:", e);
+                console.error("Share error:", e);
                 this.shareWhatsApp(tel, total);
             }
         } else {
@@ -344,32 +308,25 @@ const printer = {
         }
     },
 
+    shareWhatsApp(tel, total) {
+        const msg = encodeURIComponent(`¡Hola! Gracias por tu compra. Tu total es de $${total}. ¡Buen provecho! 🌮`);
+        let url = `https://wa.me/`;
+        if (tel) {
+            const cleanTel = tel.replace(/\D/g, '');
+            url += (cleanTel.length === 10 ? '52' + cleanTel : cleanTel);
+        }
+        url += `?text=${msg}`;
+        window.open(url, '_blank');
+    },
+
     async downloadNative(base64, name) {
         if (window.Capacitor && window.Capacitor.isNativePlatform()) {
             try {
                 const { Filesystem, Directory } = Capacitor.Plugins;
-                if (!Filesystem) throw new Error("Plugin Filesystem no disponible");
-
-                await Filesystem.writeFile({
-                    path: 'Download/' + name, // Intentar en carpeta Download
-                    data: base64,
-                    directory: Directory.ExternalStorage || Directory.Documents
-                });
-                app.showNotification("✅ Ticket guardado en descargas");
+                await Filesystem.writeFile({ path: 'Download/' + name, data: base64, directory: Directory.ExternalStorage || Directory.Documents });
+                app.showNotification("✅ Ticket guardado");
             } catch (e) {
-                console.error("Save error:", e);
-                // Segundo intento en Documents si falla ExternalStorage
-                try {
-                    const { Filesystem, Directory } = Capacitor.Plugins;
-                    await Filesystem.writeFile({
-                        path: name,
-                        data: base64,
-                        directory: Directory.Documents
-                    });
-                    app.showNotification("✅ Ticket guardado en Documentos");
-                } catch(e2) {
-                    app.showNotification("❌ Error al guardar: " + e.message);
-                }
+                app.showNotification("❌ Error al guardar");
             }
         } else {
             const link = document.createElement('a');
@@ -379,15 +336,15 @@ const printer = {
         }
     },
 
-    async printOrder(pedido) {
+    async printOrder(pedido, silent = false) {
         const data = this.formatKitchenOrder(pedido);
-        await this.sendToPrinter(data, pedido, 'cocina');
-        app.showNotification("Ticket de COCINA generado");
+        await this.sendToPrinter(data, pedido, 'cocina', silent);
+        if (!silent) app.showNotification("Ticket de COCINA generado");
     },
 
-    async printBill(pedido, conComision = false) {
+    async printBill(pedido, conComision = false, silent = false) {
         const data = this.formatBill(pedido, conComision);
-        await this.sendToPrinter(data, pedido, 'cuenta');
-        app.showNotification("Ticket de CUENTA generado");
+        await this.sendToPrinter(data, pedido, 'cuenta', silent);
+        if (!silent) app.showNotification("Ticket de CUENTA generado");
     }
 };
