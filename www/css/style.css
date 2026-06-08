@@ -1095,7 +1095,125 @@ main#content {
     .admin-card { padding: 15px; }
 }
 
-/* --- Badges de Notificación --- */
+/* --- CONFIGURACIONES DE VISTA (MODOS) --- */
+
+/* 1. CAJERO-TABLET: Layout Horizontal Fijo 70/30 */
+.pos-main-wrapper.mode-cajero-tablet {
+    display: grid !important;
+    grid-template-columns: 1fr 380px !important;
+    width: 100vw;
+}
+.pos-main-wrapper.mode-cajero-tablet .catalog-container { flex: none; width: 100%; }
+.pos-main-wrapper.mode-cajero-tablet .order-side-panel { 
+    width: 380px !important; 
+    transform: none !important; 
+    opacity: 1 !important;
+    pointer-events: all !important;
+}
+.pos-main-wrapper.mode-cajero-tablet .btn-toggle-order,
+.pos-main-wrapper.mode-cajero-tablet #pos-floating-actions {
+    display: none !important;
+}
+
+/* 2. MESERO-TABLET: Layout Híbrido Colapsable */
+.pos-main-wrapper.mode-mesero-tablet {
+    display: flex;
+    flex-direction: row;
+}
+.pos-main-wrapper.mode-mesero-tablet .order-side-panel {
+    width: 380px;
+}
+.pos-main-wrapper.mode-mesero-tablet .order-side-panel.collapsed {
+    width: 0;
+    opacity: 0;
+    transform: translateX(100%);
+}
+
+/* 3. MESERO-CELULAR: Full Screen + Bottom Sheet */
+.pos-main-wrapper.mode-mesero-celular {
+    flex-direction: column;
+}
+.pos-main-wrapper.mode-mesero-celular .catalog-container {
+    width: 100vw;
+}
+.pos-main-wrapper.mode-mesero-celular .order-side-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100vw !important;
+    height: 85vh !important;
+    z-index: 9000;
+    transform: translateY(100%);
+    border-top-left-radius: 25px;
+    border-top-right-radius: 25px;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.3);
+}
+.pos-main-wrapper.mode-mesero-celular .order-side-panel.mobile-active {
+    transform: translateY(0);
+}
+.pos-main-wrapper.mode-mesero-celular .caja-side-panel {
+    display: none;
+}
+
+/* --- MODOS DE VISUALIZACIÓN POR DISPOSITIVO --- */
+
+/* 1. MODO CAJERO-TABLET: Layout fijo 2 columnas, sin botones flotantes */
+.pos-main-wrapper.mode-cajero-tablet {
+    display: grid !important;
+    grid-template-columns: 1fr 380px !important;
+    width: 100vw;
+}
+.pos-main-wrapper.mode-cajero-tablet .order-side-panel {
+    width: 100% !important;
+    transform: none !important;
+    opacity: 1 !important;
+    pointer-events: all !important;
+}
+.pos-main-wrapper.mode-cajero-tablet .btn-toggle-order,
+.pos-main-wrapper.mode-cajero-tablet #pos-floating-actions {
+    display: none !important;
+}
+
+/* 2. MODO MESERO-TABLET: Layout híbrido colapsable */
+.pos-main-wrapper.mode-mesero-tablet {
+    display: flex;
+    flex-direction: row;
+}
+.pos-main-wrapper.mode-mesero-tablet .order-side-panel.collapsed {
+    width: 0;
+    opacity: 0;
+    transform: translateX(100%);
+    pointer-events: none;
+}
+
+/* 3. MODO MESERO-CELULAR: Full-screen con Bottom Sheet */
+.pos-main-wrapper.mode-mesero-celular {
+    flex-direction: column;
+}
+.pos-main-wrapper.mode-mesero-celular .catalog-container {
+    width: 100vw;
+}
+.pos-main-wrapper.mode-mesero-celular .order-side-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100vw !important;
+    height: 85vh !important;
+    z-index: 5000;
+    transform: translateY(100%);
+    border-top-left-radius: 25px;
+    border-top-right-radius: 25px;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.3);
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.pos-main-wrapper.mode-mesero-celular .order-side-panel.mobile-active {
+    transform: translateY(0);
+}
+.pos-main-wrapper.mode-mesero-celular .caja-side-panel {
+    display: none !important;
+}
+
+/* Badges y utilidades */
 .monitor-badge {
     position: absolute;
     top: -5px;
@@ -1114,6 +1232,7 @@ main#content {
     z-index: 100;
     border: 1px solid white;
 }
+
 
 /* Nuevos badges y estados */
 .product-card.sold-out {

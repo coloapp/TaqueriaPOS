@@ -151,11 +151,26 @@ const router = {
         this.navigate('login');
     },
 
+    getDisplayMode() {
+        const isTablet = window.innerWidth >= 900;
+        if (sync.role === 'caja' && isTablet) return 'mode-cajero-tablet';
+        if (sync.role === 'mesero' && isTablet) return 'mode-mesero-tablet';
+        return 'mode-mesero-celular';
+    },
+
     renderPOS() {
         if (!db.turnoActual && sync.role === 'caja') { this.navigate('caja'); app.showNotification("⚠️ Debe abrir caja"); return; }
         const content = document.getElementById('content');
+        const mode = this.getDisplayMode();
+        
+        // Actualizar estado de red para Cajero-Tablet
+        if (mode === 'mode-cajero-tablet') {
+            const statusEl = document.getElementById('sync-status');
+            if (statusEl) statusEl.innerText = '● MODO LOCAL (SIN RED)';
+        }
+
         content.innerHTML = `
-            <div class="pos-main-wrapper" id="pos-wrapper">
+            <div class="pos-main-wrapper ${mode}" id="pos-wrapper">
                 <!-- Columna 1: Catálogo -->
                 <div class="catalog-container">
                     <div class="user-header">
@@ -178,7 +193,7 @@ const router = {
             </div>
 
             <!-- Botones Flotantes (Solo visibles cuando el pedido está contraído) -->
-            <div class="floating-actions" id="pos-floating-actions" style="display: none;">
+            <div class="floating-actions" id="pos-floating-actions" style="${mode==='mode-cajero-tablet'?'display:none;':''}">
                 <div class="btn-float add-plato" onclick="router.nuevoPlato()">🍽️+</div>
                 <div class="btn-float cart" onclick="router.toggleOrderCollapse()">🛒</div>
             </div>
@@ -188,8 +203,11 @@ const router = {
         this.renderOrderPanel();
         this.renderCajaPanel();
         
-        // Inicializar estado de colapso si es necesario
-        this._isOrderCollapsed = false;
+        // Inicializar estado de colapso
+        this._isOrderCollapsed = (mode !== 'mode-cajero-tablet');
+        if (this._isOrderCollapsed && mode !== 'mode-mesero-celular') {
+            document.getElementById('order-side').classList.add('collapsed');
+        }
         this.updateFloatingButtonsVisibility();
     },
 
@@ -594,11 +612,12 @@ const router = {
     renderOrderPanel() {
         const container = document.getElementById('order-side'); if (!container) return;
         const isUpdate = !!this.ordenActual.id;
+        const mode = this.getDisplayMode();
+        const toggleIcon = mode === 'mode-mesero-celular' ? '↓' : '→';
         
-        // REGLA: Los botones de tipo de pedido deben tener clase activa
         container.innerHTML = `
             <div style="background:var(--primary); color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
-                <button class="btn-toggle-order" onclick="router.toggleOrderCollapse()">↓</button>
+                <button class="btn-toggle-order" onclick="router.toggleOrderCollapse()">${toggleIcon}</button>
                 <b style="flex:1; text-align:center;">${this.orderType.toUpperCase()} ${this.currentMesa ? '#'+this.currentMesa.numero : ''}</b>
                 ${this.orderType === 'mesa' ? `<button class="btn-accent" onclick="router.nuevoPlato()" style="padding:4px 10px; font-size:0.7rem;">+ PLATO</button>` : ''}
             </div>
